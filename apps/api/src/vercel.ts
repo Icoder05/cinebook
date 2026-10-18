@@ -8,6 +8,7 @@ import { migrate } from './db/migrate.js';
 import { seedIfEmpty } from './db/seed.js';
 import { describeDatabaseUrl, env, envProblems } from './env.js';
 import { sweepExpiredHolds } from './services/booking.service.js';
+import { autoSchedule } from './services/venue.service.js';
 
 let ready: Promise<Express> | null = null;
 
@@ -47,11 +48,21 @@ function restorePath(req: IncomingMessage) {
   req.url = `/api/${path}${url.search}`;
 }
 
+// Keep a rolling 7 days of showtimes (the always-on server does this on boot). The
+// scheduler is idempotent, so running it every few hours per instance is cheap.
+let lastSchedule = 0;
+function maybeSchedule() {
+  if (Date.now() - lastSchedule < 6 * 3600_000) return;
+  lastSchedule = Date.now();
+  autoSchedule(7).catch((err) => console.error('[schedule]', err));
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
     ready ??= boot();
     const app = await ready;
     maybeSweep();
+    maybeSchedule();
     restorePath(req);
     app(req as Parameters<Express>[0], res as Parameters<Express>[1]);
   } catch (err) {
