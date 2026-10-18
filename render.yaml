@@ -1,0 +1,29 @@
+# Render blueprint: ONE web service hosts the whole app (API + built React site) at a
+# single URL, e.g. https://cinebook.onrender.com.
+#
+# Works out of the box on the free plan with the embedded database (demo data is seeded
+# on boot; it resets whenever the service restarts or redeploys). For persistent data,
+# set DATABASE_URL to a Neon pooled connection string — nothing else changes.
+services:
+  - type: web
+    name: cinebook
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: ALLOW_EMBEDDED_DB
+        value: 'true'
+      - key: SEED_ON_BOOT
+        value: 'true'
+      - key: DATABASE_URL # optional: Neon pooled connection string (-pooler host)
+        sync: false
+      - key: TMDB_API_KEY # optional: live movie sync
+        sync: false

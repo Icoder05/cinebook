@@ -1,0 +1,31 @@
+{
+  "name": "cinebook",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CineBook — a portfolio-grade BookMyShow clone",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w @cinebook/api\" \"npm run dev -w @cinebook/web\"",
+    "build": "npm run build -w @cinebook/api && npm run build -w @cinebook/web",
+    "start": "npm run build && node scripts/start.mjs",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @cinebook/api",
+    "db:seed": "npm run db:seed -w @cinebook/api",
+    "db:reset": "npm run db:reset -w @cinebook/api",
+    "test:e2e": "playwright test",
+    "start:only": "node scripts/start.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "concurrently": "^9.1.2",
+    "esbuild": "^0.27.7",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

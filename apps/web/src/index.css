@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-surface text-ink-2 antialiased;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-2;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-[1240px] px-4 md:px-6;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white hover:bg-brand-dark;
+  }
+  .btn-outline {
+    @apply btn border border-brand text-brand hover:bg-brand-light;
+  }
+  .btn-ghost {
+    @apply btn text-ink hover:bg-black/5;
+  }
+  .card {
+    @apply rounded-xl bg-white shadow-card;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-gray-400 focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-ink;
+  }
+  .field-error {
+    @apply mt-1 text-xs text-red-600;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-ink transition hover:border-brand hover:text-brand;
+  }
+  .chip-active {
+    @apply border-brand bg-brand text-white hover:text-white;
+  }
+  .skeleton {
+    @apply animate-pulse rounded bg-gray-200;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* Diagonal stripes so "held" seats aren't conveyed by colour alone. */
+.seat-held {
+  background-image: repeating-linear-gradient(45deg, #d1d5db 0 3px, #f3f4f6 3px 6px);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.85) translateY(4px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[pop_\.25s_ease-out\] {
+    animation: none;
+  }
+}
