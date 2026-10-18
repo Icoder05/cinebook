@@ -1,9 +1,11 @@
+import { assertEnv } from '../env.js';
 import { closeDb, initDb } from './client.js';
 import { dropAll, migrate } from './migrate.js';
 import { seed } from './seed.js';
 import { syncMoviesFromTmdb } from '../services/tmdb.service.js';
 import { autoSchedule } from '../services/venue.service.js';
 
+assertEnv();
 const cmd = process.argv[2];
 
 await initDb();

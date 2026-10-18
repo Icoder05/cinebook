@@ -6,14 +6,20 @@ import { createApp } from './app.js';
 import { initDb } from './db/client.js';
 import { migrate } from './db/migrate.js';
 import { seedIfEmpty } from './db/seed.js';
-import { env } from './env.js';
+import { env, envProblems } from './env.js';
 import { sweepExpiredHolds } from './services/booking.service.js';
 
 let ready: Promise<Express> | null = null;
 
+/** A setup mistake we can explain safely to whoever opens the site (names only, no values). */
+class ConfigError extends Error {}
+
 function boot(): Promise<Express> {
+  if (envProblems.length) {
+    throw new ConfigError(`Vercel environment variables need fixing: ${envProblems.join('; ')}`);
+  }
   if (!env.DATABASE_URL && !env.ALLOW_EMBEDDED_DB) {
-    throw new Error('DATABASE_URL is not set — add your Neon connection string in Vercel → Settings → Environment Variables');
+    throw new ConfigError('DATABASE_URL is not set — add your Neon connection string in Vercel → Settings → Environment Variables');
   }
   return (async () => {
     await initDb();
@@ -51,8 +57,20 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   } catch (err) {
     ready = null; // retry the boot on the next request (e.g. Neon was waking up)
     console.error('[boot]', err);
-    res.statusCode = 503;
+    const config = err instanceof ConfigError;
+    // Database errors (auth failed, host not found, timeout…) carry no secrets — show them.
+    const reason = err instanceof Error ? err.message : String(err);
+    res.statusCode = config ? 500 : 503;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: { code: 'BOOT_FAILED', message: 'Service is starting up, please retry', details: {} } }));
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(
+      JSON.stringify({
+        error: {
+          code: config ? 'CONFIG_ERROR' : 'DB_UNAVAILABLE',
+          message: config ? reason : `Could not connect to the database: ${reason}`,
+          details: {},
+        },
+      }),
+    );
   }
 }

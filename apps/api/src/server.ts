@@ -3,8 +3,10 @@ import { createApp, webDistAvailable } from './app.js';
 import { closeDb, dbDriver, initDb } from './db/client.js';
 import { migrate } from './db/migrate.js';
 import { seedIfEmpty } from './db/seed.js';
-import { env } from './env.js';
+import { assertEnv, env } from './env.js';
 import { startSweeper } from './jobs/sweeper.js';
+
+assertEnv();
 
 // Check the port BEFORE opening the database: a second copy of the app (e.g. `npm start`
 // while `npm run dev` is running) must not open the same embedded database files.

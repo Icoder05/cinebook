@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FORMATS, type MovieSummary } from '@cinebook/shared';
 import { MovieCard, MovieCardSkeleton } from '../components/MovieCard';
-import { EmptyState } from '../components/States';
-import { useCity } from '../lib/city';
+import { EmptyState, ErrorState } from '../components/States';
+import { useCities, useCity } from '../lib/city';
 import { backdropUrl, fmtRuntime } from '../lib/format';
 import { useMovies } from '../lib/queries';
 
@@ -96,6 +96,7 @@ function Grid({ movies, loading, eager = false }: { movies: MovieSummary[] | und
 
 export default function Home() {
   const { city } = useCity();
+  const citiesQuery = useCities();
   const [lang, setLang] = useState<string>();
   const [genre, setGenre] = useState<string>();
   const [format, setFormat] = useState<string>();
@@ -117,6 +118,28 @@ export default function Home() {
 
   const hero = base.data?.[0];
   const anyFilter = lang || genre || format;
+
+  // Without cities nothing else can load; say so instead of showing skeletons forever.
+  const fatal = citiesQuery.error ?? upcoming.error ?? base.error;
+  if (fatal) {
+    return (
+      <ErrorState
+        error={new Error(`We couldn't load movies right now. ${fatal instanceof Error ? fatal.message : ''}`)}
+        action={
+          <button
+            className="btn-primary"
+            onClick={() => {
+              void citiesQuery.refetch();
+              void base.refetch();
+              void upcoming.refetch();
+            }}
+          >
+            Try again
+          </button>
+        }
+      />
+    );
+  }
 
   return (
     <>

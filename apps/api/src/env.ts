@@ -45,20 +45,38 @@ const schema = z.object({
   ADMIN_PASSWORD: z.string().min(8).default('Admin@12345'),
 });
 
+/**
+ * Configuration problems, by variable name only (never values). Collected instead of
+ * thrown so a serverless function can report them over HTTP; long-running entry
+ * points (server.ts, cli.ts) print them and exit via assertEnv().
+ */
+export const envProblems: string[] = [];
+
 const parsed = schema.safeParse(process.env);
-if (!parsed.success) {
-  console.error('Invalid environment:', parsed.error.flatten().fieldErrors);
-  process.exit(1);
+let data: z.infer<typeof schema>;
+if (parsed.success) {
+  data = parsed.data;
+} else {
+  const bad = parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  for (const [key, msgs] of Object.entries(bad)) envProblems.push(`${key}: ${msgs?.[0] ?? 'invalid'}`);
+  // Fall back to defaults for the bad keys so the module still loads.
+  data = schema.parse(Object.fromEntries(Object.entries(process.env).filter(([k]) => !(k in bad))));
 }
-export const env = parsed.data;
+export const env = data;
 
 if (env.NODE_ENV === 'production') {
-  if (env.JWT_ACCESS_SECRET.startsWith('dev-only')) {
-    throw new Error('JWT_ACCESS_SECRET must be set in production');
+  if (env.JWT_ACCESS_SECRET.startsWith('dev-only') && !envProblems.some((p) => p.startsWith('JWT_'))) {
+    envProblems.push('JWT_ACCESS_SECRET: must be set in production (32+ random characters)');
   }
   if (!env.DATABASE_URL && !env.ALLOW_EMBEDDED_DB) {
-    throw new Error('DATABASE_URL must be set in production (or ALLOW_EMBEDDED_DB=true for a throwaway demo)');
+    envProblems.push('DATABASE_URL: must be set in production (your Neon pooled connection string)');
   }
+}
+
+export function assertEnv() {
+  if (!envProblems.length) return;
+  console.error(`Invalid configuration:\n  - ${envProblems.join('\n  - ')}`);
+  process.exit(1);
 }
 
 export const corsOrigins = [env.CORS_ORIGINS, env.RENDER_EXTERNAL_URL ?? '']
