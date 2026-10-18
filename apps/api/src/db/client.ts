@@ -2,7 +2,6 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import pg from 'pg';
 import { drizzle as drizzlePg, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
 import { env } from '../env.js';
 import * as schema from './schema.js';
 
@@ -46,6 +45,9 @@ export async function initDb(url: string | undefined = env.DATABASE_URL): Promis
     return handle.db;
   }
 
+  // Everything PGlite-related is imported lazily: the Vercel bundle ships without it, and
+  // drizzle-orm/pglite imports @electric-sql/pglite at load time.
+  const { drizzle: drizzlePglite } = await import('drizzle-orm/pglite');
   const { PGlite } = await import('@electric-sql/pglite');
   const { btree_gist } = await import('@electric-sql/pglite/contrib/btree_gist');
   const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');

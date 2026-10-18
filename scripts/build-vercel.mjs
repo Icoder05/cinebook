@@ -3,7 +3,8 @@
 //   .vercel/output/functions/api.func ← the whole Express API bundled into one file
 //   .vercel/output/config.json       ← /api/* → function, everything else → the SPA
 import { execSync } from 'node:child_process';
-import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { builtinModules } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -30,13 +31,24 @@ await build({
   target: 'node22',
   sourcemap: true,
   // PGlite is only for local dev (never loaded when DATABASE_URL is set); pg-native is optional.
-  external: ['@electric-sql/pglite', '@electric-sql/pglite/*', 'pg-native'],
+  // drizzle-orm/pglite must stay external too: if bundled, its static import of PGlite is
+  // hoisted to the top of the ESM output and the function crashes on load.
+  external: ['@electric-sql/pglite', '@electric-sql/pglite/*', 'drizzle-orm/pglite', 'pg-native'],
   // CommonJS dependencies call require(); give the ESM bundle a real one.
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
   },
   logLevel: 'warning',
 });
+// Guard: the function ships as a single file with no node_modules, so any top-level import
+// of a package (rather than a Node built-in) would crash every request on Vercel.
+const bundled = readFileSync(resolve(fn, 'index.mjs'), 'utf8');
+const staticImports = [...bundled.matchAll(/^import\s[^;]*?from\s*"([^"]+)"|^import\s*"([^"]+)"/gm)].map((m) => m[1] ?? m[2]);
+const missing = staticImports.filter((s) => !s.startsWith('node:') && !builtinModules.includes(s));
+if (missing.length) {
+  throw new Error(`API bundle imports packages that won't exist on Vercel: ${[...new Set(missing)].join(', ')}`);
+}
+
 writeFileSync(
   resolve(fn, '.vc-config.json'),
   JSON.stringify(
