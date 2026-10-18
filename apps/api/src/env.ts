@@ -5,11 +5,42 @@ const bool = z
   .enum(['true', 'false', '1', '0'])
   .transform((v) => v === 'true' || v === '1');
 
+/**
+ * Forgive the usual copy-paste slips in dashboards: a pasted `DATABASE_URL=` prefix,
+ * Neon's `psql '…'` snippet, wrapping quotes, stray whitespace or line breaks.
+ */
+export function cleanDatabaseUrl(raw: string): string {
+  let v = raw.replace(/[\r\n\t]/g, '').trim();
+  v = v.replace(/^DATABASE_URL\s*=\s*/i, '').trim();
+  v = v.replace(/^psql\s+/i, '').trim();
+  while (/^(['"`]).*\1$/.test(v)) v = v.slice(1, -1).trim();
+  return v;
+}
+
+/** Describes a connection string without revealing it — for error messages. */
+export function describeDatabaseUrl(v: string | undefined): string {
+  if (!v) return 'DATABASE_URL is empty';
+  const scheme = /^[a-z]+:\/\//i.exec(v)?.[0] ?? `"${v.slice(0, 12).replace(/:[^@]*@/, ':***@')}…" (no postgresql:// prefix)`;
+  const host = /@([^/?:\s]+)/.exec(v)?.[1];
+  return [
+    `starts with ${scheme}`,
+    host ? `host ${host}` : 'no host found after "@"',
+    /\s/.test(v) ? 'contains spaces' : null,
+    (v.match(/postgres(ql)?:\/\//g)?.length ?? 0) > 1 ? 'contains more than one URL' : null,
+    `length ${v.length}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(4000),
   /** Neon pooled connection string. Unset → embedded PGlite in .data/pglite (local dev only). */
-  DATABASE_URL: z.string().optional(),
+  DATABASE_URL: z
+    .string()
+    .optional()
+    .transform((v) => (v ? cleanDatabaseUrl(v) : undefined)),
   /** pg pool size per process; serverless instances should keep this small. */
   DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
   JWT_ACCESS_SECRET: z
@@ -70,6 +101,8 @@ if (env.NODE_ENV === 'production') {
   }
   if (!env.DATABASE_URL && !env.ALLOW_EMBEDDED_DB) {
     envProblems.push('DATABASE_URL: must be set in production (your Neon pooled connection string)');
+  } else if (env.DATABASE_URL && !/^postgres(ql)?:\/\//.test(env.DATABASE_URL)) {
+    envProblems.push(`DATABASE_URL: should start with postgresql:// (${describeDatabaseUrl(env.DATABASE_URL)})`);
   }
 }
 

@@ -6,7 +6,7 @@ import { createApp } from './app.js';
 import { initDb } from './db/client.js';
 import { migrate } from './db/migrate.js';
 import { seedIfEmpty } from './db/seed.js';
-import { env, envProblems } from './env.js';
+import { describeDatabaseUrl, env, envProblems } from './env.js';
 import { sweepExpiredHolds } from './services/booking.service.js';
 
 let ready: Promise<Express> | null = null;
@@ -59,7 +59,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     console.error('[boot]', err);
     const config = err instanceof ConfigError;
     // Database errors (auth failed, host not found, timeout…) carry no secrets — show them.
-    const reason = err instanceof Error ? err.message : String(err);
+    let reason = err instanceof Error ? err.message : String(err);
+    if (/invalid url/i.test(reason)) {
+      reason += ` — check DATABASE_URL in Vercel (${describeDatabaseUrl(env.DATABASE_URL)})`;
+    }
     res.statusCode = config ? 500 : 503;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
