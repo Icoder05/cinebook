@@ -17,7 +17,8 @@ export default defineConfig({
     ? undefined
     : {
         command: 'npm run dev',
-        url: 'http://localhost:5173',
+        // Through Vite's proxy: ready only once the API has migrated and seeded.
+        url: 'http://localhost:5173/api/v1/health',
         reuseExistingServer: true,
         timeout: 120_000,
       },
