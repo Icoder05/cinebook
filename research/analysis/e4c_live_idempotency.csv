@@ -1,0 +1,7 @@
+trial,parallel_submits,http_200,http_409,payment_rows,successful_payments,double_charges,replay_status,replayed,after_cancel
+0,5,1,4,1,1,0,200,true,CANCELLED
+1,5,1,4,1,1,0,200,true,CANCELLED
+2,5,1,4,1,1,0,200,true,CANCELLED
+3,5,1,4,1,1,0,200,true,CANCELLED
+4,5,1,4,1,1,0,200,true,CANCELLED
+5,5,1,4,1,1,0,200,true,CANCELLED

@@ -1,0 +1,213 @@
+{
+  "runId": "main-neon",
+  "startedAt": "2026-10-25T04:51:27.046Z",
+  "experiments": [
+    "E1",
+    "E2",
+    "E3"
+  ],
+  "quick": false,
+  "git": {
+    "sha": "47a5505d1ece537576370bfc54c7e80044278126",
+    "dirty": true
+  },
+  "node": "v24.19.0",
+  "os": "Windows_NT 10.0.19045 x64",
+  "cpu": "12th Gen Intel(R) Core(TM) i5-12400F",
+  "cpuCount": 12,
+  "memoryGb": 15.9,
+  "platform": {
+    "driver": "node-postgres",
+    "host": "ep-green-hat-ao01ojro-pooler.c-2.ap-southeast-1.aws.neon.tech",
+    "pooled": true
+  },
+  "server": {
+    "version": "PostgreSQL 18.6 (fd34222) on aarch64-unknown-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+    "defaultIsolation": "read committed"
+  },
+  "networkRttMs": {
+    "samples": [
+      95.18,
+      99.05,
+      99.46,
+      102,
+      106.31,
+      102.07,
+      103.84,
+      110.24,
+      109.54,
+      95.47,
+      102.73,
+      108.12,
+      109.65,
+      103.98,
+      102.17,
+      114.05,
+      104.75,
+      100.98,
+      96.55,
+      97.88
+    ]
+  },
+  "config": {
+    "$comment": "Pre-registered design (sized for a short report). Factors, levels and replications are fixed BEFORE any run; the analysis reads this file, so no cell can be quietly dropped.",
+    "seed": 20261025,
+    "warmupTrialsPerCell": 1,
+    "strategies": {
+      "naive": "Baseline. READ COMMITTED: SELECT status; check in application code; unconditional UPDATE. The 'feral' read-check-write pattern.",
+      "conditional_update": "CineBook's design. One UPDATE … WHERE status='AVAILABLE' RETURNING; all-or-nothing by comparing the row count.",
+      "pessimistic_sorted": "SELECT … FOR UPDATE on all requested seats in one statement ordered by seat (consistent lock order), then UPDATE.",
+      "pessimistic_unordered": "SELECT … FOR UPDATE one seat at a time in the client's request order (inconsistent lock order).",
+      "optimistic_version": "Read status+version without locks; UPDATE … WHERE version = read version (Kung & Robinson style validation).",
+      "serializable": "The naive read-check-write code, but under SERIALIZABLE isolation (PostgreSQL SSI).",
+      "advisory_lock": "Coarse pessimism: pg_advisory_xact_lock(showtime) then naive read-check-write."
+    },
+    "experiments": {
+      "E1": {
+        "title": "Hot seat: correctness under contention",
+        "question": "RQ1 — Does each strategy prevent double booking when c clients request the same seat at the same instant?",
+        "workload": "single seat, every client requests it",
+        "strategies": [
+          "naive",
+          "conditional_update",
+          "pessimistic_sorted",
+          "pessimistic_unordered",
+          "optimistic_version",
+          "serializable",
+          "advisory_lock"
+        ],
+        "concurrency": [
+          2,
+          8,
+          32
+        ],
+        "seatsPerRequest": 1,
+        "seatPool": 1,
+        "trials": 20
+      },
+      "E2": {
+        "title": "Overlapping multi-seat requests: deadlocks, aborts and correctness",
+        "question": "RQ3 — How do strategies behave when clients request several seats from a small pool in random order?",
+        "workload": "pool of 10 seats; each client requests 3 random seats in random order",
+        "strategies": [
+          "naive",
+          "conditional_update",
+          "pessimistic_sorted",
+          "pessimistic_unordered",
+          "optimistic_version",
+          "serializable"
+        ],
+        "concurrency": [
+          16
+        ],
+        "seatsPerRequest": 3,
+        "seatPool": 10,
+        "trials": 15
+      },
+      "E3": {
+        "title": "Low contention: latency and throughput cost",
+        "question": "RQ2 — What latency/throughput does each correct strategy cost when clients do NOT collide?",
+        "workload": "each client books its own distinct seats, 5 sequential holds per client per trial",
+        "strategies": [
+          "naive",
+          "conditional_update",
+          "pessimistic_sorted",
+          "optimistic_version",
+          "serializable",
+          "advisory_lock"
+        ],
+        "concurrency": [
+          1,
+          16
+        ],
+        "seatsPerRequest": 1,
+        "opsPerClient": 5,
+        "trials": 6
+      },
+      "E5": {
+        "title": "Platform generalisation: embedded PGlite vs networked Postgres",
+        "question": "RQ5 — Does the test platform change the conclusion? (validity threat for local testing)",
+        "platform": "pglite",
+        "workload": "as E1",
+        "strategies": [
+          "naive",
+          "conditional_update",
+          "serializable"
+        ],
+        "concurrency": [
+          8
+        ],
+        "seatsPerRequest": 1,
+        "seatPool": 1,
+        "trials": 15
+      }
+    },
+    "live": {
+      "baseUrl": "https://cinebook-eight-chi.vercel.app",
+      "E4a": {
+        "title": "Live read latency vs PRD target (p95 < 200 ms)",
+        "endpoints": [
+          "health",
+          "movies",
+          "showtimes",
+          "seats"
+        ],
+        "samplesPerEndpointPerRound": 40,
+        "rounds": 3,
+        "pauseBetweenRoundsSec": 60
+      },
+      "E4b": {
+        "title": "Live hot-seat race through the deployed API",
+        "users": 16,
+        "trials": 12
+      },
+      "E4c": {
+        "title": "Live payment idempotency (double submit)",
+        "parallelSubmits": 5,
+        "trials": 6
+      }
+    }
+  },
+  "executionOrder": [
+    "E2/serializable/c16",
+    "E1/advisory_lock/c2",
+    "E2/pessimistic_sorted/c16",
+    "E1/pessimistic_unordered/c32",
+    "E1/conditional_update/c8",
+    "E1/naive/c8",
+    "E1/advisory_lock/c32",
+    "E1/naive/c2",
+    "E1/optimistic_version/c32",
+    "E3/advisory_lock/c1",
+    "E3/advisory_lock/c16",
+    "E3/pessimistic_sorted/c16",
+    "E1/serializable/c2",
+    "E2/naive/c16",
+    "E1/serializable/c32",
+    "E1/pessimistic_sorted/c8",
+    "E3/conditional_update/c16",
+    "E3/conditional_update/c1",
+    "E3/optimistic_version/c1",
+    "E1/serializable/c8",
+    "E2/conditional_update/c16",
+    "E3/naive/c1",
+    "E3/naive/c16",
+    "E1/pessimistic_unordered/c2",
+    "E1/pessimistic_sorted/c2",
+    "E3/pessimistic_sorted/c1",
+    "E1/naive/c32",
+    "E1/optimistic_version/c8",
+    "E1/pessimistic_sorted/c32",
+    "E3/optimistic_version/c16",
+    "E1/advisory_lock/c8",
+    "E1/pessimistic_unordered/c8",
+    "E3/serializable/c16",
+    "E1/conditional_update/c2",
+    "E2/pessimistic_unordered/c16",
+    "E3/serializable/c1",
+    "E2/optimistic_version/c16",
+    "E1/optimistic_version/c2",
+    "E1/conditional_update/c32"
+  ],
+  "finishedAt": "2026-10-25T05:17:55.420Z"
+}

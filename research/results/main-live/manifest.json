@@ -1,0 +1,32 @@
+{
+  "runId": "main-live",
+  "startedAt": "2026-10-25T05:18:43.827Z",
+  "baseUrl": "https://cinebook-eight-chi.vercel.app",
+  "design": {
+    "baseUrl": "https://cinebook-eight-chi.vercel.app",
+    "E4a": {
+      "title": "Live read latency vs PRD target (p95 < 200 ms)",
+      "endpoints": [
+        "health",
+        "movies",
+        "showtimes",
+        "seats"
+      ],
+      "samplesPerEndpointPerRound": 40,
+      "rounds": 3,
+      "pauseBetweenRoundsSec": 60
+    },
+    "E4b": {
+      "title": "Live hot-seat race through the deployed API",
+      "users": 16,
+      "trials": 12
+    },
+    "E4c": {
+      "title": "Live payment idempotency (double submit)",
+      "parallelSubmits": 5,
+      "trials": 6
+    }
+  },
+  "clientLocation": "India (client machine) → Vercel edge → function in sin1 (Singapore) → Neon ap-southeast-1",
+  "finishedAt": "2026-10-25T05:22:53.845Z"
+}

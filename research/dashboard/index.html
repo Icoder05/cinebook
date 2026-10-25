@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CineBook Experiments — Live</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1f2533; --muted:#667085; --line:#e4e7ec; --bad:#d92d20; --good:#039855; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 20px; background:#333545; color:#fff; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  .pill { background:rgba(255,255,255,.12); padding:4px 10px; border-radius:999px; font-size:12px; }
+  main { padding:16px 20px; display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card h2 { font-size:14px; margin:0 0 8px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; grid-column:1/-1; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .kpi b { display:block; font-size:24px; }
+  .kpi span { color:var(--muted); font-size:12px; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin-top:6px; }
+  .bar > i { display:block; height:100%; background:#F84464; width:0; transition:width .3s; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  td, th { padding:4px 6px; border-bottom:1px solid var(--line); text-align:right; }
+  td:first-child, th:first-child { text-align:left; }
+  .bad { color:var(--bad); font-weight:600; } .good { color:var(--good); }
+  canvas { max-height:280px; }
+  @media (max-width:520px) { main { grid-template-columns:1fr; padding:12px; } .kpis { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>CineBook concurrency experiments — live</h1>
+  <span class="pill" id="run">waiting for a run…</span>
+  <span class="pill" id="cell">—</span>
+</header>
+<main>
+  <div class="kpis">
+    <div class="kpi"><span>Progress</span><b id="k-progress">0%</b><div class="bar"><i id="k-bar"></i></div></div>
+    <div class="kpi"><span>Trials logged</span><b id="k-trials">0</b></div>
+    <div class="kpi"><span>Transactions logged</span><b id="k-ops">0</b></div>
+    <div class="kpi"><span>Double bookings observed</span><b id="k-dbl" class="good">0</b></div>
+  </div>
+  <section class="card"><h2>Double bookings per trial, by strategy (mean)</h2><canvas id="c-dbl"></canvas></section>
+  <section class="card"><h2>Outcome mix by strategy</h2><canvas id="c-mix"></canvas></section>
+  <section class="card"><h2>Latency p50 / p95 by strategy (ms)</h2><canvas id="c-lat"></canvas></section>
+  <section class="card"><h2>Iteration-wise trial makespan (ms)</h2><canvas id="c-iter"></canvas></section>
+  <section class="card"><h2>Latency distribution (all transactions, ms)</h2><canvas id="c-hist"></canvas></section>
+  <section class="card"><h2>Running summary</h2><table id="t-sum"><thead><tr><th>strategy</th><th>trials</th><th>winners/trial</th><th>double bookings</th><th>aborts</th><th>p95 ms</th></tr></thead><tbody></tbody></table></section>
+</main>
+<script>
+const COLORS = { naive:'#d92d20', conditional_update:'#F84464', pessimistic_sorted:'#2e90fa', pessimistic_unordered:'#7a5af8', optimistic_version:'#12b76a', serializable:'#f79009', advisory_lock:'#667085' };
+const ORDER = Object.keys(COLORS);
+let S;
+function resetState() { S = { trials:[], lat:{}, outcomes:{}, ops:0, done:0, total:0 }; }
+resetState();
+
+const opts = (extra={}) => ({ animation:false, responsive:true, plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10 } } }, ...extra });
+const chDbl = new Chart(document.getElementById('c-dbl'), { type:'bar', data:{ labels:[], datasets:[{ label:'double bookings / trial', data:[], backgroundColor:[] }] }, options:opts({ plugins:{ legend:{ display:false } } }) });
+const chMix = new Chart(document.getElementById('c-mix'), { type:'bar', data:{ labels:[], datasets:[] }, options:opts({ scales:{ x:{ stacked:true }, y:{ stacked:true } } }) });
+const chLat = new Chart(document.getElementById('c-lat'), { type:'bar', data:{ labels:[], datasets:[{ label:'p50', data:[], backgroundColor:'#98a2b3' }, { label:'p95', data:[], backgroundColor:'#F84464' }] }, options:opts({ scales:{ y:{ type:'logarithmic' } } }) });
+const chIter = new Chart(document.getElementById('c-iter'), { type:'scatter', data:{ datasets:[] }, options:opts({ scales:{ x:{ title:{ display:true, text:'trial # (run order)' } }, y:{ type:'logarithmic', title:{ display:true, text:'makespan ms' } } } }) });
+const chHist = new Chart(document.getElementById('c-hist'), { type:'bar', data:{ labels:[], datasets:[{ label:'transactions', data:[], backgroundColor:'#2e90fa' }] }, options:opts({ plugins:{ legend:{ display:false } } }) });
+
+const q = (xs, p) => { if (!xs.length) return 0; const s=[...xs].sort((a,b)=>a-b); const h=(s.length-1)*p, lo=Math.floor(h), hi=Math.ceil(h); return s[lo]+(h-lo)*(s[hi]-s[lo]); };
+
+function ingest(lines) {
+  for (const raw of lines) {
+    let e; try { e = JSON.parse(raw); } catch { continue; }
+    if (e.type === 'run_start') { document.getElementById('run').textContent = 'run ' + e.runId; S.total = e.totalCells; }
+    else if (e.type === 'progress') { S.done = e.done; S.total = e.total; }
+    else if (e.type === 'cell_start') document.getElementById('cell').textContent = `now: ${e.exp} · ${e.strategy} · c=${e.c}`;
+    else if (e.type === 'run_end') document.getElementById('cell').textContent = 'finished';
+    else if (e.type === 'op' && !e.warmup) {
+      S.ops++;
+      (S.lat[e.strategy] ??= []).push(e.latencyMs);
+      const o = (S.outcomes[e.strategy] ??= {}); o[e.outcome] = (o[e.outcome] ?? 0) + 1;
+    } else if (e.type === 'trial' && !e.warmup) S.trials.push(e);
+  }
+}
+
+function render() {
+  const strategies = ORDER.filter((s) => S.lat[s] || S.trials.some((t) => t.strategy === s));
+  const pct = S.total ? Math.round((S.done / S.total) * 100) : 0;
+  document.getElementById('k-progress').textContent = pct + '%';
+  document.getElementById('k-bar').style.width = pct + '%';
+  document.getElementById('k-trials').textContent = S.trials.length;
+  document.getElementById('k-ops').textContent = S.ops.toLocaleString();
+  const totalDbl = S.trials.reduce((n, t) => n + t.doubleBookings, 0);
+  const kd = document.getElementById('k-dbl'); kd.textContent = totalDbl; kd.className = totalDbl ? 'bad' : 'good';
+
+  const byS = (s) => S.trials.filter((t) => t.strategy === s);
+  chDbl.data.labels = strategies;
+  chDbl.data.datasets[0].data = strategies.map((s) => { const t = byS(s); return t.length ? t.reduce((n, x) => n + x.doubleBookings, 0) / t.length : 0; });
+  chDbl.data.datasets[0].backgroundColor = strategies.map((s) => COLORS[s]);
+  chDbl.update();
+
+  const kinds = ['success','conflict','serialization_failure','deadlock','error'];
+  const kc = { success:'#12b76a', conflict:'#98a2b3', serialization_failure:'#f79009', deadlock:'#d92d20', error:'#000' };
+  chMix.data.labels = strategies;
+  chMix.data.datasets = kinds.map((k) => ({ label:k, backgroundColor:kc[k], data:strategies.map((s) => S.outcomes[s]?.[k] ?? 0) }));
+  chMix.update();
+
+  chLat.data.labels = strategies;
+  chLat.data.datasets[0].data = strategies.map((s) => +q(S.lat[s] ?? [], 0.5).toFixed(1));
+  chLat.data.datasets[1].data = strategies.map((s) => +q(S.lat[s] ?? [], 0.95).toFixed(1));
+  chLat.update();
+
+  chIter.data.datasets = strategies.map((s) => ({ label:s, backgroundColor:COLORS[s], pointRadius:2, data: S.trials.map((t, i) => [i, t]).filter(([, t]) => t.strategy === s).map(([i, t]) => ({ x:i, y:t.makespanMs })) }));
+  chIter.update();
+
+  const all = Object.values(S.lat).flat();
+  if (all.length) {
+    const max = q(all, 0.99), bins = 30, w = max / bins || 1, h = new Array(bins).fill(0);
+    for (const v of all) h[Math.min(bins - 1, Math.floor(v / w))]++;
+    chHist.data.labels = h.map((_, i) => Math.round(i * w));
+    chHist.data.datasets[0].data = h;
+    chHist.update();
+  }
+
+  document.querySelector('#t-sum tbody').innerHTML = strategies.map((s) => {
+    const t = byS(s), n = t.length || 1;
+    const dbl = t.reduce((a, x) => a + x.doubleBookings, 0);
+    const ab = t.reduce((a, x) => a + x.serializationFailures + x.deadlocks, 0);
+    return `<tr><td>${s}</td><td>${t.length}</td><td>${(t.reduce((a, x) => a + x.successes, 0) / n).toFixed(2)}</td><td class="${dbl ? 'bad' : 'good'}">${dbl}</td><td>${ab}</td><td>${q(S.lat[s] ?? [], 0.95).toFixed(0)}</td></tr>`;
+  }).join('');
+}
+
+const es = new EventSource('/events');
+es.addEventListener('reset', () => { resetState(); render(); });
+es.onmessage = (m) => ingest(JSON.parse(m.data));
+setInterval(render, 1500);
+</script>
+</body>
+</html>

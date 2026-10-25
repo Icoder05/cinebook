@@ -1,0 +1,7 @@
+experiment,strategy,concurrency,trials,transactions,mean_winners_per_trial,trials_with_double_booking,p_double_booking,p_ci_low,p_ci_high,double_bookings_total,double_bookings_per_trial,lost_updates_total,aborts_total,abort_rate,latency_p50_ms,latency_p95_ms,latency_p95_ci_low,latency_p95_ci_high,makespan_median_ms,success,conflict,deadlock,serialization_failure,error,seats_sold_per_trial
+E2,conditional_update,16,15,240,2.27,0,0,0,0.2039,0,0,0,0,0,764.31,1334.37,1272.12,1380.19,1378.52,34,206,0,0,0,6.8
+E2,naive,16,15,240,16,15,1,0.7961,1,571,38.07,571,0,0,1407.25,2432.1,2330.26,2629.23,2382.36,240,0,0,0,0,9.93
+E2,optimistic_version,16,15,240,2.4,0,0,0,0.2039,0,0,0,0,0,894.3,1462.05,1395.69,1500.69,1489.47,36,204,0,0,0,7.2
+E2,pessimistic_sorted,16,15,240,2.47,0,0,0,0.2039,0,0,0,0,0,921.36,1575.71,1475.39,1705.53,1566.01,37,203,0,0,0,7.4
+E2,pessimistic_unordered,16,15,240,2.27,0,0,0,0.2039,0,0,0,93,0.3875,2889.25,5431.94,5018.59,5831.71,4658.06,34,113,93,0,0,6.8
+E2,serializable,16,15,240,1,0,0,0,0.2039,0,0,0,225,0.9375,503.49,544.38,535.48,549.51,535.77,15,0,0,225,0,3

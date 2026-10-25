@@ -1,0 +1,501 @@
+{
+  "hypotheses": {
+    "H1": {
+      "statement": "Under contention the naive read-check-write baseline double-books (P > 0), while the conditional UPDATE does not.",
+      "naive": {
+        "trials": 60,
+        "withDoubleBooking": 60,
+        "rate": 1,
+        "ci": [
+          0.9398,
+          1
+        ]
+      },
+      "conditional_update": {
+        "trials": 60,
+        "withDoubleBooking": 0
+      },
+      "fisherExactP": 2.0700738882431555e-35,
+      "supported": true
+    },
+    "H2": {
+      "statement": "Every non-baseline strategy produces zero double bookings (E1+E2).",
+      "perStrategy": {
+        "conditional_update": {
+          "trials": 75,
+          "transactions": 1080,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.04
+        },
+        "pessimistic_sorted": {
+          "trials": 75,
+          "transactions": 1080,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.04
+        },
+        "pessimistic_unordered": {
+          "trials": 75,
+          "transactions": 1080,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.04
+        },
+        "optimistic_version": {
+          "trials": 75,
+          "transactions": 1080,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.04
+        },
+        "serializable": {
+          "trials": 75,
+          "transactions": 1080,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.04
+        },
+        "advisory_lock": {
+          "trials": 60,
+          "transactions": 840,
+          "doubleBookings": 0,
+          "upper95_rate_per_trial": 0.05
+        }
+      },
+      "supported": true
+    },
+    "H3": {
+      "statement": "When requests do not collide, strategies differ in latency (Kruskal–Wallis), and coarse locking (advisory) is the slowest at c>1.",
+      "tests": [
+        {
+          "concurrency": 1,
+          "kruskalWallis": {
+            "H": 153.53,
+            "df": 5,
+            "p": 0
+          },
+          "pairwise": [
+            {
+              "concurrency": 1,
+              "comparison": "naive vs conditional_update",
+              "n1": 30,
+              "n2": 30,
+              "U": 792,
+              "p_raw": 4.4440478741414324e-7,
+              "cliffs_delta": 0.76,
+              "magnitude": "large",
+              "median_diff_ms": 26.09,
+              "p_holm": 4.4440478741414324e-7
+            },
+            {
+              "concurrency": 1,
+              "comparison": "pessimistic_sorted vs conditional_update",
+              "n1": 30,
+              "n2": 30,
+              "U": 890,
+              "p_raw": 8.152745145650897e-11,
+              "cliffs_delta": 0.9778,
+              "magnitude": "large",
+              "median_diff_ms": 44.26,
+              "p_holm": 2.445823543695269e-10
+            },
+            {
+              "concurrency": 1,
+              "comparison": "optimistic_version vs conditional_update",
+              "n1": 30,
+              "n2": 30,
+              "U": 900,
+              "p_raw": 3.019851035901411e-11,
+              "cliffs_delta": 1,
+              "magnitude": "large",
+              "median_diff_ms": 108.02,
+              "p_holm": 1.5099255179507054e-10
+            },
+            {
+              "concurrency": 1,
+              "comparison": "serializable vs conditional_update",
+              "n1": 30,
+              "n2": 30,
+              "U": 877,
+              "p_raw": 2.8715851918548196e-10,
+              "cliffs_delta": 0.9489,
+              "magnitude": "large",
+              "median_diff_ms": 35.48,
+              "p_holm": 5.743170383709639e-10
+            },
+            {
+              "concurrency": 1,
+              "comparison": "advisory_lock vs conditional_update",
+              "n1": 30,
+              "n2": 30,
+              "U": 900,
+              "p_raw": 3.019851035901411e-11,
+              "cliffs_delta": 1,
+              "magnitude": "large",
+              "median_diff_ms": 199.37,
+              "p_holm": 1.5099255179507054e-10
+            }
+          ]
+        },
+        {
+          "concurrency": 16,
+          "kruskalWallis": {
+            "H": 1936.15,
+            "df": 5,
+            "p": 0
+          },
+          "pairwise": [
+            {
+              "concurrency": 16,
+              "comparison": "naive vs conditional_update",
+              "n1": 480,
+              "n2": 480,
+              "U": 225986,
+              "p_raw": 0,
+              "cliffs_delta": 0.9617,
+              "magnitude": "large",
+              "median_diff_ms": 90.31,
+              "p_holm": 0
+            },
+            {
+              "concurrency": 16,
+              "comparison": "pessimistic_sorted vs conditional_update",
+              "n1": 480,
+              "n2": 480,
+              "U": 225301,
+              "p_raw": 0,
+              "cliffs_delta": 0.9557,
+              "magnitude": "large",
+              "median_diff_ms": 100.4,
+              "p_holm": 0
+            },
+            {
+              "concurrency": 16,
+              "comparison": "optimistic_version vs conditional_update",
+              "n1": 480,
+              "n2": 480,
+              "U": 227829,
+              "p_raw": 0,
+              "cliffs_delta": 0.9777,
+              "magnitude": "large",
+              "median_diff_ms": 96.69,
+              "p_holm": 0
+            },
+            {
+              "concurrency": 16,
+              "comparison": "serializable vs conditional_update",
+              "n1": 456,
+              "n2": 480,
+              "U": 216134,
+              "p_raw": 0,
+              "cliffs_delta": 0.9749,
+              "magnitude": "large",
+              "median_diff_ms": 94.2,
+              "p_holm": 0
+            },
+            {
+              "concurrency": 16,
+              "comparison": "advisory_lock vs conditional_update",
+              "n1": 480,
+              "n2": 480,
+              "U": 230381,
+              "p_raw": 0,
+              "cliffs_delta": 0.9998,
+              "magnitude": "large",
+              "median_diff_ms": 5269.38,
+              "p_holm": 0
+            }
+          ]
+        }
+      ]
+    },
+    "H5": {
+      "statement": "The test platform changes the observed outcome of the same buggy code (naive, c=8): networked Postgres vs embedded PGlite.",
+      "neon": {
+        "trials": 20,
+        "withDoubleBooking": 20
+      },
+      "pglite": {
+        "trials": 15,
+        "withDoubleBooking": 0
+      },
+      "fisherExactP": 3.0788716141813056e-10,
+      "supported": true
+    },
+    "H4": {
+      "statement": "Deployed read endpoints meet the PRD target p95 < 200 ms (warm, measured end-to-end from the client).",
+      "perEndpoint": [
+        {
+          "endpoint": "health",
+          "p95": 150.25,
+          "ci": [
+            139.79,
+            153.29
+          ],
+          "meets": true
+        },
+        {
+          "endpoint": "movies",
+          "p95": 59.77,
+          "ci": [
+            52.45,
+            83.63
+          ],
+          "meets": true
+        },
+        {
+          "endpoint": "showtimes",
+          "p95": 146.44,
+          "ci": [
+            137.68,
+            175.27
+          ],
+          "meets": true
+        },
+        {
+          "endpoint": "seats",
+          "p95": 199.9,
+          "ci": [
+            144.4,
+            417.2
+          ],
+          "meets": false
+        }
+      ],
+      "networkBaselineP50": 33.36,
+      "supported": false
+    }
+  },
+  "live": {
+    "race": {
+      "trials": 12,
+      "exactlyOneWinner": 12,
+      "doubleBookings": 0,
+      "errors": 0,
+      "upper95_rate": 0.25,
+      "holdLatencyP50": 146.17,
+      "holdLatencyP95": 351.92,
+      "allReleased": true
+    },
+    "idempotency": {
+      "trials": 6,
+      "submits": 30,
+      "doubleCharges": 0,
+      "oneSuccessfulPaymentEveryTrial": true,
+      "replaysFlagged": 6
+    }
+  },
+  "dataQuality": [
+    {
+      "run": "main-neon",
+      "lines": 12020,
+      "unparseable": 0,
+      "ops": 11280,
+      "trials": 621,
+      "warmupTrialsExcluded": 39,
+      "invalidLatency": 0,
+      "errors": 0
+    },
+    {
+      "run": "main-pglite",
+      "lines": 443,
+      "unparseable": 0,
+      "ops": 384,
+      "trials": 48,
+      "warmupTrialsExcluded": 3,
+      "invalidLatency": 0,
+      "errors": 0
+    },
+    {
+      "run": "main-live",
+      "lines": 765,
+      "unparseable": 0,
+      "ops": 738,
+      "trials": 18,
+      "warmupTrialsExcluded": 0,
+      "invalidLatency": 0,
+      "errors": 0
+    }
+  ],
+  "environment": {
+    "neon": {
+      "runId": "main-neon",
+      "startedAt": "2026-10-25T04:51:27.046Z",
+      "experiments": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "quick": false,
+      "git": {
+        "sha": "47a5505d1ece537576370bfc54c7e80044278126",
+        "dirty": true
+      },
+      "node": "v24.19.0",
+      "os": "Windows_NT 10.0.19045 x64",
+      "cpu": "12th Gen Intel(R) Core(TM) i5-12400F",
+      "cpuCount": 12,
+      "memoryGb": 15.9,
+      "platform": {
+        "driver": "node-postgres",
+        "host": "ep-green-hat-ao01ojro-pooler.c-2.ap-southeast-1.aws.neon.tech",
+        "pooled": true
+      },
+      "server": {
+        "version": "PostgreSQL 18.6 (fd34222) on aarch64-unknown-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+        "defaultIsolation": "read committed"
+      },
+      "networkRttMs": {
+        "samples": [
+          95.18,
+          99.05,
+          99.46,
+          102,
+          106.31,
+          102.07,
+          103.84,
+          110.24,
+          109.54,
+          95.47,
+          102.73,
+          108.12,
+          109.65,
+          103.98,
+          102.17,
+          114.05,
+          104.75,
+          100.98,
+          96.55,
+          97.88
+        ]
+      },
+      "executionOrder": [
+        "E2/serializable/c16",
+        "E1/advisory_lock/c2",
+        "E2/pessimistic_sorted/c16",
+        "E1/pessimistic_unordered/c32",
+        "E1/conditional_update/c8",
+        "E1/naive/c8",
+        "E1/advisory_lock/c32",
+        "E1/naive/c2",
+        "E1/optimistic_version/c32",
+        "E3/advisory_lock/c1",
+        "E3/advisory_lock/c16",
+        "E3/pessimistic_sorted/c16",
+        "E1/serializable/c2",
+        "E2/naive/c16",
+        "E1/serializable/c32",
+        "E1/pessimistic_sorted/c8",
+        "E3/conditional_update/c16",
+        "E3/conditional_update/c1",
+        "E3/optimistic_version/c1",
+        "E1/serializable/c8",
+        "E2/conditional_update/c16",
+        "E3/naive/c1",
+        "E3/naive/c16",
+        "E1/pessimistic_unordered/c2",
+        "E1/pessimistic_sorted/c2",
+        "E3/pessimistic_sorted/c1",
+        "E1/naive/c32",
+        "E1/optimistic_version/c8",
+        "E1/pessimistic_sorted/c32",
+        "E3/optimistic_version/c16",
+        "E1/advisory_lock/c8",
+        "E1/pessimistic_unordered/c8",
+        "E3/serializable/c16",
+        "E1/conditional_update/c2",
+        "E2/pessimistic_unordered/c16",
+        "E3/serializable/c1",
+        "E2/optimistic_version/c16",
+        "E1/optimistic_version/c2",
+        "E1/conditional_update/c32"
+      ],
+      "finishedAt": "2026-10-25T05:17:55.420Z"
+    },
+    "pglite": {
+      "runId": "main-pglite",
+      "startedAt": "2026-10-25T05:18:02.359Z",
+      "experiments": [
+        "E5"
+      ],
+      "quick": false,
+      "git": {
+        "sha": "47a5505d1ece537576370bfc54c7e80044278126",
+        "dirty": true
+      },
+      "node": "v24.19.0",
+      "os": "Windows_NT 10.0.19045 x64",
+      "cpu": "12th Gen Intel(R) Core(TM) i5-12400F",
+      "cpuCount": 12,
+      "memoryGb": 15.9,
+      "platform": {
+        "driver": "PGlite (WASM, in-process, single connection)",
+        "host": "local",
+        "pooled": false
+      },
+      "server": {
+        "version": "PostgreSQL 16.4 on x86_64-pc-linux-gnu, compiled by emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5), 32-bit",
+        "defaultIsolation": "read committed"
+      },
+      "networkRttMs": {
+        "samples": [
+          0.62,
+          0.45,
+          0.51,
+          0.41,
+          0.38,
+          0.38,
+          0.36,
+          0.42,
+          0.32,
+          0.3,
+          0.3,
+          0.3,
+          0.65,
+          0.37,
+          0.44,
+          0.37,
+          0.38,
+          0.42,
+          0.35,
+          0.34
+        ]
+      },
+      "executionOrder": [
+        "E5/conditional_update/c8",
+        "E5/serializable/c8",
+        "E5/naive/c8"
+      ],
+      "finishedAt": "2026-10-25T05:18:02.974Z"
+    },
+    "live": {
+      "runId": "main-live",
+      "startedAt": "2026-10-25T05:18:43.827Z",
+      "baseUrl": "https://cinebook-eight-chi.vercel.app",
+      "design": {
+        "baseUrl": "https://cinebook-eight-chi.vercel.app",
+        "E4a": {
+          "title": "Live read latency vs PRD target (p95 < 200 ms)",
+          "endpoints": [
+            "health",
+            "movies",
+            "showtimes",
+            "seats"
+          ],
+          "samplesPerEndpointPerRound": 40,
+          "rounds": 3,
+          "pauseBetweenRoundsSec": 60
+        },
+        "E4b": {
+          "title": "Live hot-seat race through the deployed API",
+          "users": 16,
+          "trials": 12
+        },
+        "E4c": {
+          "title": "Live payment idempotency (double submit)",
+          "parallelSubmits": 5,
+          "trials": 6
+        }
+      },
+      "clientLocation": "India (client machine) → Vercel edge → function in sin1 (Singapore) → Neon ap-southeast-1",
+      "finishedAt": "2026-10-25T05:22:53.845Z"
+    },
+    "neonRttMedianMs": 102.45
+  }
+}

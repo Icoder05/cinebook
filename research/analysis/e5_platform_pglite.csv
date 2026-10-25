@@ -1,0 +1,4 @@
+experiment,strategy,concurrency,trials,transactions,mean_winners_per_trial,trials_with_double_booking,p_double_booking,p_ci_low,p_ci_high,double_bookings_total,double_bookings_per_trial,lost_updates_total,aborts_total,abort_rate,latency_p50_ms,latency_p95_ms,latency_p95_ci_low,latency_p95_ci_high,makespan_median_ms
+E5,conditional_update,8,15,120,1,0,0,0,0.2039,0,0,0,0,0,5.58,9.32,9.03,10.15,9.26
+E5,naive,8,15,120,1,0,0,0,0.2039,0,0,0,0,0,5.1,8.41,7.91,8.92,7.98
+E5,serializable,8,15,120,1,0,0,0,0.2039,0,0,0,0,0,5.22,9.05,8.36,10.07,8.59
