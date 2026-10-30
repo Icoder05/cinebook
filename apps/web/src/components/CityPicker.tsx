@@ -46,7 +46,7 @@ export function CityPicker({ open, onClose: close }: { open: boolean; onClose: (
                 }}
                 className={clsx(
                   'flex w-full flex-col items-center gap-2 rounded-xl border p-4 text-sm transition hover:border-brand hover:text-brand',
-                  c.id === city?.id ? 'border-brand bg-brand-light text-brand' : 'border-gray-200',
+                  c.id === city?.id ? 'border-brand bg-brand-light text-brand-dark' : 'border-gray-200',
                 )}
                 aria-pressed={c.id === city?.id}
               >
