@@ -7,17 +7,17 @@
 
 <div class="columns">
 
-<p class="abstract"><b><i>Abstract</i>—When thousands of users try to buy the same seats at once, a booking system must guarantee that each seat is sold exactly once. This paper compares seven concurrency-control strategies for seat reservation—a naive read-check-write baseline, the conditional UPDATE used by the CineBook system, two pessimistic-locking variants, optimistic version checking, PostgreSQL SERIALIZABLE isolation, and a coarse advisory lock—on a cloud PostgreSQL database, and validates the deployed system end to end. Across 11 280 logged transactions in 621 trials, the baseline double-booked in 60 of 60 contended trials (95% CI 94–100%), while all six other strategies produced zero double bookings (per-trial upper bound 4%). The conditional UPDATE had the lowest median latency (344 ms versus 435–445 ms, Cliff's δ ≥ 0.96) and 23% higher throughput than the next best strategy; unordered row locking deadlocked on 38.8% of multi-seat requests and SERIALIZABLE aborted up to 97% of contending transactions. On the live deployment, 12/12 sixteen-way races produced exactly one winner and 6/6 parallel payment double-submits charged once. Finally, the same faulty code showed no double bookings on an embedded test database (0/15 versus 20/20, p = 3×10⁻¹⁰), showing that local tests can hide this class of defect.</b></p>
+<p class="abstract"><b>Abstract.</b> When thousands of users try to buy the same seats at once, a booking system must guarantee that each seat is sold exactly once. This paper compares seven concurrency-control strategies for seat reservation—a naive read-check-write baseline, the conditional UPDATE used by the CineBook system, two pessimistic-locking variants, optimistic version checking, PostgreSQL SERIALIZABLE isolation, and a coarse advisory lock—on a cloud PostgreSQL database, and validates the deployed system end to end. Across 11 280 logged transactions in 621 trials, the baseline double-booked in 60 of 60 contended trials (95% CI 94–100%), while all six other strategies produced zero double bookings (per-trial upper bound 4%). The conditional UPDATE had the lowest median latency (344 ms versus 435–445 ms, Cliff's δ ≥ 0.96) and 23% higher throughput than the next best strategy; unordered row locking deadlocked on 38.8% of multi-seat requests and SERIALIZABLE aborted up to 97% of contending transactions. On the live deployment, 12/12 sixteen-way races produced exactly one winner and 6/6 parallel payment double-submits charged once. Finally, the same faulty code showed no double bookings on an embedded test database (0/15 versus 20/20, p = 3×10⁻¹⁰), showing that local tests can hide this class of defect.</p>
 
-<p class="keywords"><b><i>Index Terms</i>—concurrency control, transaction isolation, double booking, PostgreSQL, serializable snapshot isolation, optimistic concurrency control, serverless computing, performance evaluation.</b></p>
+<p class="keywords"><b>Keywords:</b> concurrency control, transaction isolation, double booking, PostgreSQL, serializable snapshot isolation, optimistic concurrency control, serverless computing, performance evaluation.</p>
 
-## I. Introduction
+## 1. Introduction
 
 Ticketing is a classic hot-spot workload: demand concentrates on a few rows—the best seats of a popular show—at the same instant. Recent launches illustrate the scale. Ticketmaster reported 3.5 billion system requests during the 2022 Eras Tour presale [15], and BookMyShow's site failed at the opening of the 2024 Coldplay India sale, when roughly 13 million users were reported to compete for about 180 000 tickets [16]. Under such contention, any gap between *checking* that a seat is free and *marking* it sold allows two buyers to purchase the same seat.
 
 The product requirements of CineBook, the system studied here, state one non-negotiable property: two users can never book the same seat. CineBook enforces it with a single conditional UPDATE executed inside PostgreSQL. This paper asks whether that design is (a) correct, (b) cheaper than the alternatives, and (c) correct and fast enough in the deployed system. Its contributions are a pre-registered experimental comparison of seven strategies on a production-grade stack, an end-to-end validation of the deployed application, and evidence that the choice of test platform determines whether the defect is observable at all.
 
-## II. Related Work
+## 2. Related Work
 
 *A. Anomalies and Isolation.* Berenson *et al.* [1] showed that the ANSI isolation levels are ambiguous and defined anomalies such as the *lost update*—the exact failure behind double booking, in which two transactions read "available" and both write "sold." PostgreSQL's default READ COMMITTED level permits this for read-then-write logic. A single UPDATE ... WHERE status = 'AVAILABLE', however, is safe: when the target row is locked by a concurrent writer, PostgreSQL waits and re-evaluates the WHERE clause against the newly committed row version before updating [6].
 
@@ -31,7 +31,7 @@ The product requirements of CineBook, the system studied here, state one non-neg
 
 *F. Research Gap.* Prior work explains *why* naive code fails and *what* each mechanism guarantees, but rarely offers a reproducible, quantitative comparison for the seat-reservation pattern (one hot row; all-or-nothing multi-row holds) on a serverless and database-as-a-service stack, where wide-area round-trip time rather than CPU dominates cost. It also seldom examines how the *test environment* affects whether such defects are visible. This study addresses both gaps.
 
-## III. Research Questions and Hypotheses
+## 3. Research Questions and Hypotheses
 
 The questions and hypotheses in Table I were fixed in a configuration file before any experiment was run.
 
@@ -45,7 +45,7 @@ The questions and hypotheses in Table I were fixed in a configuration file befor
 | RQ4 | Is the deployed system correct and within p95 < 200 ms? | **H4** yes, for all read endpoints |
 | RQ5 | Does the test platform change the observed outcome? | **H5** an embedded, serial database hides the race |
 
-## IV. Methodology
+## 4. Methodology
 
 *A. System Under Test.* All strategies run against identical tables in an isolated research schema of the production Neon database (PostgreSQL 18.6, AWS ap-southeast-1, pooled connections). Each strategy holds 1–3 seats all-or-nothing and inserts one *claim* row per seat in the same transaction. The number of double bookings in a trial is therefore
 
@@ -71,9 +71,9 @@ where n<sub>s</sub> is the number of committed claims on seat s. The baseline (*
 
 *E. Data Management.* Every transaction attempt is appended to a JSON-lines log with run identifier, sequence number, timestamp, inputs, outcome, SQLSTATE, error text and latency; every trial adds counts, makespan, client CPU and memory; every run has a manifest recording the code version, software versions, hardware, database host, network samples and execution order. Validation against the design found 12 020 log lines, none unparseable, no invalid latencies and no missing cells, with 39 warm-up trials excluded. A live dashboard (Fig. 8) streamed progress, outcome mix, latency percentiles and iteration-wise makespan during the runs, refreshing as each transaction was logged.
 
-<figure class="wide"><img src="figures-paper/fig8_live_dashboard.png"><figcaption>Fig. 8. Real-time experiment dashboard captured during the main run (13% complete): progress, double bookings per strategy, outcome mix, latency percentiles, iteration-wise trial makespan and latency distribution.</figcaption></figure>
+<figure><img src="figures-paper/fig8_live_dashboard.png"><figcaption>Fig. 8. Real-time experiment dashboard captured during the main run (13% complete): progress, double bookings per strategy, outcome mix, latency percentiles, iteration-wise trial makespan and latency distribution.</figcaption></figure>
 
-## V. Results
+## 5. Results
 
 *A. Correctness under Contention (RQ1).* The baseline double-booked in every contended trial: 60 of 60 (Wilson 95% CI 94.0–100%). Every client won the seat—mean winners per trial were 2, 8 and 32—producing 780 double bookings in E1 and 571 in E2. The other six strategies produced zero double bookings across 75 trials and 1080 transactions each (advisory lock: 60 trials, 840 transactions), a per-trial upper bound of 4% (5%) at 95% confidence. Against the conditional UPDATE the difference is decisive (Fisher's exact p = 2.1×10⁻³⁵). H1 and H2 are supported (Fig. 1).
 
@@ -81,7 +81,7 @@ where n<sub>s</sub> is the number of committed claims on seat s. The baseline (*
 
 The cost of correctness grows with contention because losers must wait for the winner's lock (Fig. 2). At c = 32 the conditional UPDATE, optimistic and pessimistic strategies cluster at a p95 of 2.9–3.0 s, while the advisory lock (5.7 s) and the baseline (5.6 s) are slowest. SERIALIZABLE stays near 0.5 s only because it aborts losers immediately, with abort rates of 50%, 88% and 97% at c = 2, 8 and 32; each loser receives an error that the application must handle or retry.
 
-<figure class="wide"><img src="figures-paper/fig2_hot_seat_latency.png"><figcaption>Fig. 2. 95th-percentile transaction latency under contention (E1), by strategy and concurrency (log scale).</figcaption></figure>
+<figure><img src="figures-paper/fig2_hot_seat_latency.png"><figcaption>Fig. 2. 95th-percentile transaction latency under contention (E1), by strategy and concurrency (log scale).</figcaption></figure>
 
 *B. Overlapping Multi-Seat Requests (RQ3).* With 16 clients each requesting 3 of 10 seats (Fig. 3), unordered locking deadlocked on 93 of 240 requests (38.8%), confirmed by 101 deadlocks in PostgreSQL's own statistics (including the warm-up trial), and its p95 latency rose to 5.4 s. SERIALIZABLE sold only 3.0 seats per trial versus 6.8–7.4 for the other correct strategies, aborting 93.8% of requests even when a non-overlapping allocation existed. The conditional UPDATE, sorted locking and optimistic validation behaved alike, with no deadlocks. The baseline "sold" 9.9 of 10 seats per trial but with 38 double bookings per trial.
 
@@ -108,13 +108,13 @@ The conditional UPDATE also delivered the highest throughput, 38.3 holds/s [36.8
 
 H4 is partially supported. Three endpoints meet p95 < 200 ms with their whole interval below the target. The seat map's p95 lies on the boundary and its interval reaches 417 ms, driven by occasional responses of up to 1.8 s.
 
-<figure class="wide"><img src="figures-paper/fig6_live_latency_cdf.png"><figcaption>Fig. 6. Cumulative distribution of live end-to-end latency (E4a); the dashed line marks the 200 ms target.</figcaption></figure>
+<figure><img src="figures-paper/fig6_live_latency_cdf.png"><figcaption>Fig. 6. Cumulative distribution of live end-to-end latency (E4a); the dashed line marks the 200 ms target.</figcaption></figure>
 
 *E. Platform Effect (RQ5).* Running the identical baseline code with 8 clients on the embedded PGlite database used for local development produced 0 of 15 trials with double bookings, versus 20 of 20 on Neon (Fisher's exact p = 3.1×10⁻¹⁰; Fig. 7). PGlite executes one transaction at a time, so the race window never opens. H5 is supported: a test suite that passes on an embedded database demonstrates logic, not concurrency safety.
 
 <figure><img src="figures-paper/fig7_platform.png"><figcaption>Fig. 7. Share of trials with at least one double booking on networked PostgreSQL and embedded PGlite (c = 8). PGlite values are zero for all strategies.</figcaption></figure>
 
-## VI. Discussion
+## 6. Discussion
 
 *A. Findings.* First, read-check-write in application code is not an edge-case risk: under simultaneous demand it oversold in every trial, and the damage scaled with the number of buyers. Second, every database-enforced strategy was correct, so the choice among them concerns cost and failure behaviour. Third, for seat reservation on a high-latency serverless stack the conditional UPDATE dominated—correct, fastest, highest throughput, with no deadlocks and no false aborts—whereas unordered locking added deadlocks, SERIALIZABLE added aborts that reduced seats sold, and a coarse lock destroyed throughput. Fourth, the live system preserved seat and payment integrity under real concurrent traffic.
 
@@ -122,15 +122,13 @@ H4 is partially supported. Three endpoints meet p95 < 200 ms with their whole in
 
 *C. Practical Impact.* For booking and inventory systems, the evidence supports a simple rule: let one conditional statement in the database decide ownership, and run tests against a real concurrent database. For CineBook, the core requirement is now supported by measurement; the open item is the tail latency of the seat-map endpoint.
 
-## VII. Conclusion and Future Work
+## 7. Conclusion and Future Work
 
 This study compared seven concurrency-control strategies for seat reservation under controlled, repeated experiments and validated a deployed system end to end. The naive baseline failed in every contended trial, while database-enforced strategies were uniformly correct; among them, the single conditional UPDATE offered the best latency and throughput without deadlocks or false aborts. The results also show that embedded test databases can conceal concurrency defects. Future work will repeat the study from multiple regions and at higher concurrency behind a virtual queue, add retry policies to measure goodput, evaluate SKIP LOCKED-based seat suggestion, and optimize the seat-map query to bring its 95th percentile below 200 ms. All code, the pre-registered design, raw logs, analysis outputs and figure scripts are available in the project repository to support independent replication.
 
 ## Appendix: Detailed Results
 
 Tables IV–VI report every configuration of the database experiments, generated directly from the analysis outputs in the repository. DB denotes double bookings; abort rate counts deadlock and serialization failures over all transactions; intervals are 95% percentile-bootstrap intervals; Holm p is the Holm-adjusted Mann–Whitney p-value against the conditional UPDATE at the same concurrency.
-
-<div class="wide-table">
 
 <div class="tcap">TABLE IV<br><span>Hot-Seat Results per Configuration (E1, 20 Trials per Row)</span></div>
 
@@ -158,10 +156,6 @@ Tables IV–VI report every configuration of the database experiments, generated
 | advisory | 8 | 0/20 | 0 | 0.0% | 1089 | 1772 [1725, 1806] |
 | advisory | 32 | 0/20 | 0 | 0.0% | 3032 | 5697 [5566, 5794] |
 
-</div>
-
-<div class="wide-table">
-
 <div class="tcap">TABLE V<br><span>Overlapping Multi-Seat Requests (E2, c = 16, 15 Trials, 240 Requests)</span></div>
 
 | Strategy | Success | Conflict | Deadlock | Ser. fail. | Seats sold / trial | DB total | p95 (ms) |
@@ -172,10 +166,6 @@ Tables IV–VI report every configuration of the database experiments, generated
 | pess. unordered | 34 | 113 | 93 | 0 | 6.8 | 0 | 5432 |
 | optimistic | 36 | 204 | 0 | 0 | 7.2 | 0 | 1462 |
 | serializable | 15 | 0 | 0 | 225 | 3.0 | 0 | 544 |
-
-</div>
-
-<div class="wide-table">
 
 <div class="tcap">TABLE VI<br><span>Low-Contention Latency, Throughput and Pairwise Tests vs. Conditional UPDATE (E3)</span></div>
 
@@ -193,8 +183,6 @@ Tables IV–VI report every configuration of the database experiments, generated
 | optimistic | 16 | 480 | 441 [438, 448] | 510 | 30.5 [29.5, 31.5] | 0.98 | < 10⁻¹⁵ |
 | serializable | 16 | 456 | 439 [434, 442] | 496 | 29.8 [28.0, 31.4] | 0.97 | < 10⁻¹⁵ |
 | advisory | 16 | 480 | 5614 [5605, 5619] | 5771 | 2.8 [2.8, 2.8] | 1.00 | < 10⁻¹⁵ |
-
-</div>
 
 ## References
 

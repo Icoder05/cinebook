@@ -194,7 +194,7 @@ for (const f of figures) {
   const html = `<!doctype html><html><head><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>body{margin:0;font-family:Segoe UI,Roboto,sans-serif;background:#fff}h3{font-size:16px;margin:12px 16px 0;color:#101828}#w{width:${W}px;height:${H}px;margin:${paper ? 8 : 4}px 16px}</style></head>
   <body>${paper ? '' : `<h3>${f.title}</h3>`}<div id="w"><canvas id="c"></canvas></div><script>
-  if (${paper}) { Chart.defaults.font.family = '"Times New Roman", Times, serif'; Chart.defaults.font.size = 17; Chart.defaults.color = '#111'; }
+  if (${paper}) { Chart.defaults.font.family = 'Calibri, Carlito, sans-serif'; Chart.defaults.font.size = 17; Chart.defaults.color = '#111'; }
   const errorBars = { id:'errorBars', afterDatasetsDraw(chart){ const {ctx}=chart; chart.data.datasets.forEach((ds,i)=>{ if(!ds.errorBars) return; const meta=chart.getDatasetMeta(i); meta.data.forEach((bar,j)=>{ const e=ds.errorBars[j]; if(!e) return; const y=chart.scales.y; ctx.save(); ctx.strokeStyle='#101828'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(bar.x,y.getPixelForValue(e[0])); ctx.lineTo(bar.x,y.getPixelForValue(e[1])); ctx.moveTo(bar.x-5,y.getPixelForValue(e[0])); ctx.lineTo(bar.x+5,y.getPixelForValue(e[0])); ctx.moveTo(bar.x-5,y.getPixelForValue(e[1])); ctx.lineTo(bar.x+5,y.getPixelForValue(e[1])); ctx.stroke(); ctx.restore(); }); }); } };
   const cfg = ${JSON.stringify(f.config)};
   cfg.options = Object.assign({ animation:false, responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }, cfg.options);
