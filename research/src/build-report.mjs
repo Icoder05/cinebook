@@ -11,24 +11,48 @@ const { chromium } = require('@playwright/test');
 const dir = resolve(dirname(fileURLToPath(import.meta.url)), '../report');
 const md = readFileSync(resolve(dir, 'REPORT.md'), 'utf8');
 
+// IEEE references: number in a fixed-width gutter, text aligned beside it.
+const refs = (h) =>
+  h.replace(/<p>\[(\d+)\] ([\s\S]*?)<\/p>/g, '<p class="ref"><span class="rn">[$1]</span><span class="rt">$2</span></p>');
+
 const html = `<!doctype html><html><head><meta charset="utf-8"><title>CineBook concurrency report</title>
 <style>
-  @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
-  body { font: 10.2pt/1.4 "Times New Roman", Georgia, serif; color: #111; }
-  h1 { font-size: 17pt; margin: 0 0 4pt; line-height: 1.2; }
-  h2 { font-size: 13pt; margin: 14pt 0 4pt; border-bottom: 1px solid #ccc; padding-bottom: 2pt; }
-  h3 { font-size: 11pt; margin: 10pt 0 3pt; }
-  p, li { text-align: justify; }
-  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; margin: 6pt 0; page-break-inside: avoid; }
-  th, td { border: 1px solid #bbb; padding: 2.5pt 4pt; text-align: left; vertical-align: top; }
-  th { background: #f1f1f1; }
-  img { display: block; width: 84%; margin: 4pt auto 0; page-break-inside: avoid; }
-  code { font: 8.8pt Consolas, monospace; background: #f4f4f4; padding: 0 2pt; }
-  pre { font: 8.5pt Consolas, monospace; background: #f6f6f6; padding: 6pt; white-space: pre-wrap; }
-  blockquote { margin: 6pt 0; padding: 4pt 10pt; border-left: 3px solid #999; background: #fafafa; }
-  .meta { color: #444; font-size: 9.5pt; margin-bottom: 8pt; }
-  em.caption { display:block; font-size: 9pt; color: #333; margin: 0 0 8pt; }
-</style></head><body>${marked.parse(md)}</body></html>`;
+  /* IEEE conference layout (A4): two columns, 10 pt Times, small-caps Roman-numeral
+     section heads, "TABLE I" captions above tables, "Fig. 1." captions below figures. */
+  @page { size: A4; }
+  html { -webkit-print-color-adjust: exact; }
+  body { margin: 0; font: 10pt/1.18 "Times New Roman", Times, serif; color: #000; hyphens: auto; }
+  .title-block { text-align: center; margin: 0 0 14pt; }
+  .title-block h1 { font-size: 22pt; font-weight: normal; line-height: 1.12; margin: 0 0 12pt; }
+  .authors { display: flex; justify-content: center; font-size: 10pt; line-height: 1.25; }
+  .author .name { font-size: 11pt; }
+  .columns { column-count: 2; column-gap: 4.2mm; text-align: justify; }
+  p { margin: 0; text-indent: 1em; }
+  p.abstract, p.keywords { font-size: 9pt; line-height: 1.2; text-indent: 1em; margin-bottom: 6pt; }
+  p.keywords { margin-bottom: 4pt; }
+  p.abstract b, p.keywords b { font-weight: bold; }
+  h2 { font-size: 10pt; font-weight: normal; font-variant: small-caps; text-align: center; letter-spacing: 0.02em; margin: 9pt 0 4pt; break-after: avoid; }
+  p:has(> em:first-child) { text-indent: 1em; }
+  em { font-style: italic; }
+  .eq { text-align: center; margin: 4pt 0; text-indent: 0; font-style: italic; }
+  .tcap { text-align: center; font-size: 8pt; margin: 8pt 0 3pt; text-indent: 0; break-after: avoid; letter-spacing: 0.04em; }
+  .tcap span { font-variant: small-caps; letter-spacing: 0.02em; }
+  table { border-collapse: collapse; width: 100%; font-size: 7.6pt; line-height: 1.15; margin: 0 0 8pt; break-inside: avoid; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+  th { border-bottom: 0.6px solid #000; font-weight: normal; font-variant: small-caps; padding: 2pt 3pt; text-align: left; }
+  td { padding: 1.6pt 3pt; text-align: left; vertical-align: top; }
+  figure { margin: 7pt 0 8pt; break-inside: avoid; text-indent: 0; }
+  figure img { display: block; width: var(--fig-w, 100%); margin: 0 auto; }
+  figure.wide { column-span: all; margin: 8pt 0 10pt; }
+  figure.wide img { width: var(--wide-w, 88%); }
+  figure.wide figcaption { width: var(--wide-w, 88%); margin: 3pt auto 0; }
+  .wide-table { column-span: all; width: 82%; margin: 0 auto; break-inside: avoid; }
+  .wide-table table { font-size: 7.8pt; }
+  .refs p.ref { display: flex; gap: 0; text-indent: 0; padding-left: 0; }
+  .refs p.ref .rn { flex: 0 0 2.4em; }
+  .refs p.ref .rt { flex: 1; }
+  figcaption { font-size: 8pt; line-height: 1.2; text-align: justify; margin-top: 3pt; }
+  .refs p { font-size: 8pt; line-height: 1.2; text-indent: -1.9em; padding-left: 1.9em; margin-bottom: 2.5pt; text-align: left; }
+</style></head><body>${refs(marked.parse(md))}</body></html>`;
 
 const htmlPath = resolve(dir, 'report.html');
 writeFileSync(htmlPath, html);
@@ -38,8 +62,9 @@ await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'networkidle' });
 await page.pdf({
   path: resolve(dir, 'report.pdf'), format: 'A4', printBackground: true,
   displayHeaderFooter: true, headerTemplate: '<span></span>',
-  footerTemplate: '<div style="font-size:8pt;width:100%;text-align:center;color:#666"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
-  margin: { top: '18mm', bottom: '18mm', left: '17mm', right: '17mm' },
+  footerTemplate: '<div style="font-family:Times New Roman,serif;font-size:8pt;width:100%;text-align:center;color:#000"><span class="pageNumber"></span></div>',
+  // IEEE A4: top 19 mm, side 14.3 mm; bottom leaves room for the page number.
+  margin: { top: '19mm', bottom: '22mm', left: '14.3mm', right: '14.3mm' },
 });
 const pdf = readFileSync(resolve(dir, 'report.pdf'));
 const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;

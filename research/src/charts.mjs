@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('@playwright/test');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const A = resolve(root, 'research/analysis');
-const F = resolve(root, 'research/report/figures');
+const F = resolve(root, process.argv.includes('--paper') ? 'research/report/figures-paper' : 'research/report/figures');
 mkdirSync(F, { recursive: true });
 
 function readCsv(name) {
@@ -183,12 +183,18 @@ const browser = await chromium.launch();
 let errors = 0;
 for (const f of figures) {
   // Fresh page per figure: globals from one chart must not leak into the next.
-  const page = await browser.newPage({ viewport: { width: 1000, height: 560 }, deviceScaleFactor: 2 });
+  // Paper style (--paper): no title in the image (the report captions it), larger type
+  // so it stays legible at single-column width, serif font to match the text.
+  const paper = process.argv.includes('--paper');
+  const W = paper ? 720 : 968;
+  const H = paper ? 450 : 500;
+  const page = await browser.newPage({ viewport: { width: W + 32, height: H + 60 }, deviceScaleFactor: 3 });
   page.on('pageerror', (e) => { errors++; console.log('  page error:', e.message); });
   // A tiny error-bar plugin (Chart.js has none built in).
   const html = `<!doctype html><html><head><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <style>body{margin:0;font-family:Segoe UI,Roboto,sans-serif;background:#fff}h3{font-size:16px;margin:12px 16px 0;color:#101828}#w{width:968px;height:500px;margin:4px 16px}</style></head>
-  <body><h3>${f.title}</h3><div id="w"><canvas id="c"></canvas></div><script>
+  <style>body{margin:0;font-family:Segoe UI,Roboto,sans-serif;background:#fff}h3{font-size:16px;margin:12px 16px 0;color:#101828}#w{width:${W}px;height:${H}px;margin:${paper ? 8 : 4}px 16px}</style></head>
+  <body>${paper ? '' : `<h3>${f.title}</h3>`}<div id="w"><canvas id="c"></canvas></div><script>
+  if (${paper}) { Chart.defaults.font.family = '"Times New Roman", Times, serif'; Chart.defaults.font.size = 17; Chart.defaults.color = '#111'; }
   const errorBars = { id:'errorBars', afterDatasetsDraw(chart){ const {ctx}=chart; chart.data.datasets.forEach((ds,i)=>{ if(!ds.errorBars) return; const meta=chart.getDatasetMeta(i); meta.data.forEach((bar,j)=>{ const e=ds.errorBars[j]; if(!e) return; const y=chart.scales.y; ctx.save(); ctx.strokeStyle='#101828'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(bar.x,y.getPixelForValue(e[0])); ctx.lineTo(bar.x,y.getPixelForValue(e[1])); ctx.moveTo(bar.x-5,y.getPixelForValue(e[0])); ctx.lineTo(bar.x+5,y.getPixelForValue(e[0])); ctx.moveTo(bar.x-5,y.getPixelForValue(e[1])); ctx.lineTo(bar.x+5,y.getPixelForValue(e[1])); ctx.stroke(); ctx.restore(); }); }); } };
   const cfg = ${JSON.stringify(f.config)};
   cfg.options = Object.assign({ animation:false, responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }, cfg.options);
@@ -197,7 +203,8 @@ for (const f of figures) {
   </script></body></html>`;
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
-  await page.screenshot({ path: resolve(F, f.file), fullPage: true });
+  if (paper) await page.locator('#w').screenshot({ path: resolve(F, f.file) });
+  else await page.screenshot({ path: resolve(F, f.file), fullPage: true });
   await page.close();
   console.log('wrote', f.file);
 }
