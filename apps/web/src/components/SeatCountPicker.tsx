@@ -240,7 +240,7 @@ export function SeatCountPicker({
                     ? [`Only ${t.available} left`, 'text-amber-600']
                     : ratio < 0.25
                       ? ['Filling fast', 'text-amber-600']
-                      : ['Available', 'text-emerald-600'];
+                      : ['Available', 'text-emerald-700'];
               return (
                 <li key={t.id} className="text-xs">
                   <p className="font-medium uppercase tracking-wide text-ink-muted">{t.name}</p>

@@ -90,7 +90,7 @@ function Header() {
             <Ticket className="h-5 w-5" aria-hidden />
           </span>
           <span className="text-lg font-bold tracking-tight">
-            cine<span className="text-brand">book</span>
+            cine<span className="text-brand-on-dark">book</span>
           </span>
         </Link>
         <SearchBox className="hidden flex-1 md:block md:max-w-xl" />
@@ -142,11 +142,35 @@ function Footer() {
   );
 }
 
+/**
+ * After client-side navigation, move focus to the new page's main region so keyboard and
+ * screen-reader users start at the top of the content rather than wherever the old page's
+ * focused element used to be (WCAG 2.4.3).
+ */
+function useFocusMainOnNavigate() {
+  const { pathname } = useLocation();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    document.getElementById('main')?.focus({ preventScroll: true });
+  }, [pathname]);
+}
+
 export function Layout() {
+  useFocusMainOnNavigate();
   return (
     <div className="flex min-h-screen flex-col">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-ink focus:shadow"
+      >
+        Skip to main content
+      </a>
       <Header />
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
         <Suspense fallback={<PageSpinner />}>
           <Outlet />
         </Suspense>

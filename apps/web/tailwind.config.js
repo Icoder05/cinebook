@@ -4,7 +4,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: { DEFAULT: '#F84464', dark: '#DC3558', light: '#FEE5EA' },
+        // DEFAULT meets WCAG AA (≥ 4.5:1) under white text and as text on white or brand-light;
+        // on-dark is the shade for text on the ink header.
+        brand: { DEFAULT: '#D81E43', dark: '#B5173A', light: '#FEE5EA', 'on-dark': '#FF7A90' },
         ink: { DEFAULT: '#333545', 2: '#1F2533', muted: '#666666' },
         surface: '#F5F5F5',
       },
