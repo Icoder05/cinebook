@@ -53,6 +53,22 @@ npm run experiments:live          # E4 against the deployed site (~8 min, cleans
 npm run experiments:analyze && npm run experiments:figures && npm run report:build
 ```
 
+The extended study (E6–E12, about 45 minutes) uses one script per experiment:
+
+```bash
+npm run experiments:web           # E6 public pages: CineBook, BookMyShow, District (--site CineBook re-audits only ours)
+npm run experiments:ux            # E7 booking funnel, KLM, keyboard-only booking (live, cleans up)
+npm run experiments:scale         # E8 10/50/100/500 concurrent users (live, ~500 research accounts, cleans up)
+npm run experiments:reliability   # E9 failure injection (live, cleans up)
+npm run experiments:db            # E10 1 M-row synthetic schema research_e10 on Neon (dropped afterwards)
+npm run experiments:security      # E11 OWASP API Top 10 checks (local PGlite API + live headers)
+npm run experiments:recsim        # E12 recommender simulation (offline, seeded)
+```
+
+E7's keyboard results before and after the accessibility fixes are kept as the runs
+`main-ux-prefix`, `main-ux-midfix` and `main-ux`; E6's post-fix audit is `main-web-postfix`.
+SUS needs human participants: see [`experiments/ux/`](../experiments/ux/README.md).
+
 Add `--quick` to the runner for a 3-trial smoke test:
 `node experiments/harness/runner.mjs --exp E1 --quick --run smoke`.
 

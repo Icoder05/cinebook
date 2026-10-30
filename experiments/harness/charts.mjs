@@ -179,6 +179,147 @@ const figures = [];
   }
 }
 
+// ---- E6–E12 (extended study) ---------------------------------------------------------------
+const SITE = { CineBook: '#D81E43', BookMyShow: '#475467', District: '#98a2b3' };
+{
+  const rows = readCsv('e6_web_perf.csv');
+  const labels = rows.map((r) => `${r.site} ${r.page}`);
+  figures.push({
+    file: 'fig9_web_lcp.png',
+    title: 'Fig. 9 — Largest Contentful Paint, mean ± SD of 5 cold loads (E6)',
+    config: {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'LCP (ms)', backgroundColor: rows.map((r) => SITE[r.site]), data: rows.map((r) => r.lcp_mean_ms),
+          errorBars: rows.map((r) => [Math.max(0, r.lcp_mean_ms - r.lcp_sd_ms), r.lcp_mean_ms + r.lcp_sd_ms]),
+        }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 1800, title: { display: true, text: 'LCP (ms), lower is better' } } } },
+    },
+  });
+  figures.push({
+    file: 'fig10_page_weight.png',
+    title: 'Fig. 10 — Page weight by resource type (E6)',
+    config: {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'JavaScript', backgroundColor: '#1d2939', data: rows.map((r) => r.js_kb) },
+          { label: 'Images', backgroundColor: '#98a2b3', data: rows.map((r) => r.image_kb) },
+          { label: 'Other', backgroundColor: '#d0d5dd', data: rows.map((r) => Math.max(0, +(r.transfer_kb - r.js_kb - r.image_kb).toFixed(1))) },
+        ],
+      },
+      options: { scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'transferred (KB)' } } } },
+    },
+  });
+}
+{
+  const rows = readCsv('e6_accessibility.csv');
+  const groups = [
+    ['CineBook (before)', rows.filter((r) => r.site === 'CineBook' && r.phase === 'before fixes')],
+    ['CineBook (after)', rows.filter((r) => r.site === 'CineBook' && r.phase === 'after fixes')],
+    ['BookMyShow home', rows.filter((r) => r.site === 'BookMyShow')],
+    ['District movies', rows.filter((r) => r.site === 'District')],
+  ];
+  const sumOf = (g, k) => g.reduce((t, r) => t + (r[k] || 0), 0);
+  figures.push({
+    file: 'fig11_accessibility.png',
+    title: 'Fig. 11 — WCAG 2.2 AA violations (affected elements) by impact, axe-core (E6)',
+    config: {
+      type: 'bar',
+      data: {
+        labels: groups.map((g) => g[0]),
+        datasets: [['critical', '#7a271a'], ['serious', '#d92d20'], ['moderate', '#f79009'], ['minor', '#fdb022']].map(([k, c]) => ({
+          label: k, backgroundColor: c, data: groups.map((g) => sumOf(g[1], k)),
+        })),
+      },
+      options: { scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'elements violating a rule' } } } },
+    },
+  });
+}
+{
+  const rows = readCsv('e8_scalability.csv');
+  const users = [10, 50, 100, 500];
+  const line = (w, k, color, dash) => ({
+    label: `${w} ${k.replace('_ms', '')}`, borderColor: color, backgroundColor: color, borderDash: dash, borderWidth: 2.5,
+    data: users.map((n) => rows.find((r) => r.workload === w && r.users === n)?.[k] ?? null),
+  });
+  figures.push({
+    file: 'fig12_scalability_latency.png',
+    title: 'Fig. 12 — Latency vs concurrent users on the live deployment (E8)',
+    config: {
+      type: 'line',
+      data: { labels: users.map(String), datasets: [line('read', 'p50_ms', '#2e90fa', [4, 3]), line('read', 'p95_ms', '#2e90fa', []), line('write', 'p50_ms', '#D81E43', [4, 3]), line('write', 'p95_ms', '#D81E43', [])] },
+      options: { scales: { x: { title: { display: true, text: 'concurrent users' } }, y: { beginAtZero: true, title: { display: true, text: 'latency (ms)' } } } },
+    },
+  });
+  figures.push({
+    file: 'fig13_scalability_throughput.png',
+    title: 'Fig. 13 — Throughput vs concurrent users, mean ± SD of 3 repeats (E8)',
+    config: {
+      type: 'bar',
+      data: {
+        labels: users.map(String),
+        datasets: [['read', '#2e90fa'], ['write', '#D81E43']].map(([w, c]) => {
+          const rs = users.map((n) => rows.find((r) => r.workload === w && r.users === n));
+          return { label: `${w} (successful requests/s)`, backgroundColor: c, data: rs.map((r) => r?.throughput_mean ?? null), errorBars: rs.map((r) => (r ? [Math.max(0, r.throughput_mean - r.throughput_sd), r.throughput_mean + r.throughput_sd] : null)) };
+        }),
+      },
+      options: { scales: { x: { title: { display: true, text: 'concurrent users' } }, y: { beginAtZero: true, suggestedMax: 700, title: { display: true, text: 'requests per second (mean ± SD)' } } } },
+    },
+  });
+}
+{
+  const rows = readCsv('e10_db_optimisation.csv');
+  const pairs = [
+    ['seat map', 'no index (seq scan)', 'PK (showtime_id, seat_id)'],
+    ['hold (2 seats)', 'no index (seq scan)', 'PK (showtime_id, seat_id)'],
+    ['expiry sweep', 'no index', 'partial index (HELD only)'],
+    ['my bookings', 'no index', 'composite (user_id, created_at)'],
+    ['seat map + layout', 'normalised (3-table join)', 'denormalised (1 table)'],
+  ];
+  const get = (q, v) => rows.find((r) => r.query === q && r.variant === v)?.median_ms ?? null;
+  figures.push({
+    file: 'fig14_db_optimisation.png',
+    title: 'Fig. 14 — Server-side execution time before and after optimisation, 1 M seat rows (E10), log scale',
+    config: {
+      type: 'bar',
+      data: {
+        labels: pairs.map((p) => p[0]),
+        datasets: [
+          { label: 'baseline (no index / normalised join)', backgroundColor: '#98a2b3', data: pairs.map((p) => get(p[0], p[1])) },
+          { label: 'optimised (index / denormalised)', backgroundColor: '#D81E43', data: pairs.map((p) => get(p[0], p[2])) },
+        ],
+      },
+      options: { scales: { y: { type: 'logarithmic', min: 0.01, max: 200, title: { display: true, text: 'median execution time (ms)' } } } },
+    },
+  });
+}
+{
+  const rows = readCsv('e12_recsim.csv').filter((r) => r.noise === 0.5);
+  const order = ['default', 'popularity', 'language_filter', 'content_based'];
+  const colors = { default: '#d0d5dd', popularity: '#98a2b3', language_filter: '#475467', content_based: '#D81E43' };
+  const metrics = [['hr3', 'HR@3'], ['mrr', 'MRR'], ['ndcg5', 'NDCG@5']];
+  figures.push({
+    file: 'fig15_recsim.png',
+    title: 'Fig. 15 — Discovery quality by ranking policy, 2,000 simulated personas, 95 % CI (E12)',
+    config: {
+      type: 'bar',
+      data: {
+        labels: metrics.map((m) => m[1]),
+        datasets: order.map((p) => {
+          const r = rows.find((x) => x.policy === p);
+          return { label: p.replace(/_/g, ' '), backgroundColor: colors[p], data: metrics.map(([k]) => r[`${k}_mean`]), errorBars: metrics.map(([k]) => [r[`${k}_ci_lo`], r[`${k}_ci_hi`]]) };
+        }),
+      },
+      options: { scales: { y: { beginAtZero: true, max: 1, title: { display: true, text: 'score (higher is better)' } } } },
+    },
+  });
+}
+
 // ---- render ---------------------------------------------------------------------------------
 const browser = await chromium.launch();
 let errors = 0;

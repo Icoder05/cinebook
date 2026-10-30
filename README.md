@@ -6,7 +6,7 @@ systems guarantee that a seat is never sold twice.**
 | | |
 |---|---|
 | 🎬 **Live demonstration** | https://cinebook-eight-chi.vercel.app |
-| 📄 **Research report (8 pp.)** | [PDF](docs/research-report.pdf) · [Word](docs/research-report.docx) |
+| 📄 **Research report (19 pp.)** | [PDF](docs/research-report.pdf) · [Word](docs/research-report.docx) |
 | 📚 **Literature review** | [PDF](docs/literature-review.pdf) · [Word](docs/literature-review.docx) |
 | 🧭 **Technical documentation** | [methodology](docs/methodology.md) · [system architecture](docs/system-architecture.md) · [reproducibility](docs/reproducibility.md) · [tests](tests/README.md) |
 | 📈 **Experiment dashboard** | `npm run experiments:dashboard` → http://localhost:4600 ([screenshot](figures/fig8_live_dashboard.png)) |
@@ -103,6 +103,7 @@ the research-harness pipeline: [`docs/system-architecture.md`](docs/system-archi
 | Client | Intel i5-12400F (12 threads), 15.9 GB RAM, Windows 10, Node.js 24.19; median RTT to DB 102 ms |
 | Experiments | E1 hot seat (*c* = 2, 8, 32 × 20 trials) · E2 overlapping 3-of-10 seats (*c* = 16 × 15) · E3 no collisions (*c* = 1, 16 × 6 × 5 holds) · E4 live site (latency 3 × 40 × 4 endpoints; 12 sixteen-user races; 6 payment double-submits) · E5 PGlite (*c* = 8 × 15) |
 | Volume | 13 228 logged events, 12 402 transactions, 687 trials, collected 25 Oct 2026 |
+| Extended study (E6–E12) | web benchmark vs BookMyShow/District, booking funnel + KLM + keyboard-only, 10–500 concurrent users, failure injection, 1 M-row index study, OWASP API Top 10 suite, recommender simulation · 38 854 logged events, 30–31 Oct 2026 |
 | Seed | `20261025` |
 
 ## 8. Results
@@ -135,6 +136,21 @@ the research-harness pipeline: [`docs/system-architecture.md`](docs/system-archi
 - **Latency:** read p95 was health 150 ms, movies 60 ms, showtimes 146 ms and seat map 200 ms [95% CI 144–417].
 
 **Platform (E5).** The same baseline code double-booked in 20/20 trials on Neon and in 0/15 on embedded PGlite.
+
+**Extended study (E6–E12).**
+- **Web vs competitors (E6):** LCP comparable (CineBook home 981 ms, BookMyShow 1 153 ms, District 1 090 ms; p = 0.47); page weight 695 KB vs 3 594 KB and 2 933 KB (p = 0.0018); WCAG violations 8 → 0 after fixes, vs 133 (BookMyShow) and 52 (District).
+- **Booking funnel (E7):** 8 screens, 17 clicks, 77 keystrokes; 4.5 ± 0.3 s system time; KLM 71 s. Keyboard-only booking went from 0/3 to 3/3 after fixing a toast keyboard trap, focus loss on navigation and a 400-stop seat grid.
+- **Scalability (E8):** 13 860 requests at 10–500 concurrent users, 0 errors; p95 ≈ 200 ms up to 50 users, 1.7–1.8 s at 500.
+- **Reliability (E9):** 48/48 failure-injection trials passed; 0 double charges; all database invariants hold.
+- **Database (E10):** on 1 M rows the primary key makes the seat map 155× and the hold 456× faster; a partial expiry index is 20× smaller than a full one.
+- **Security (E11):** 46/46 OWASP API Top 10 checks pass.
+- **Discovery (E12, simulation):** content-based ranking raises MRR from 0.28 to 0.72; a plain language filter gets most of the way (0.55).
+
+<p align="center">
+<img src="figures/fig12_scalability_latency.png" width="48%" alt="Latency vs concurrent users">
+<img src="figures/fig11_accessibility.png" width="48%" alt="WCAG violations by impact">
+</p>
+<p align="center"><em>Left: latency vs concurrent users on the live site (E8). Right: WCAG 2.2 AA violations, CineBook before and after the fixes vs competitors (E6).</em></p>
 
 All figures: [`figures/`](figures/) · all tables: [`data/processed/`](data/processed/).
 

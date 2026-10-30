@@ -171,6 +171,47 @@ export function kruskalWallis(groups) {
   return { H: h, df, p: 1 - jStat.chisquare.cdf(h, df) };
 }
 
+/** Mean with a Student-t 95 % confidence interval (for small numbers of repeats). */
+export function tCI(xs, alpha = 0.05) {
+  const n = xs.length;
+  const m = mean(xs);
+  if (n < 2) return { mean: m, sd: NaN, lo: NaN, hi: NaN, n };
+  const s = sd(xs);
+  const h = jStat.studentt.inv(1 - alpha / 2, n - 1) * (s / Math.sqrt(n));
+  return { mean: m, sd: s, lo: m - h, hi: m + h, n };
+}
+
+/**
+ * Wilcoxon signed-rank test for paired samples (two-sided). Zero differences are dropped
+ * (Wilcoxon's method); normal approximation with tie correction, no continuity correction
+ * — matches scipy.stats.wilcoxon(x, y, method='approx'). r = |z|/√n is the effect size.
+ */
+export function wilcoxonSignedRank(x, y) {
+  const d = x.map((v, i) => v - y[i]).filter((v) => v !== 0);
+  const n = d.length;
+  if (!n) return { W: 0, z: 0, p: 1, n: 0, r: 0 };
+  const { ranks, ties } = rank(d.map(Math.abs));
+  const wPlus = sum(ranks.filter((_, i) => d[i] > 0));
+  const mu = (n * (n + 1)) / 4;
+  const sigma = Math.sqrt((n * (n + 1) * (2 * n + 1)) / 24 - sum(ties.map((t) => t ** 3 - t)) / 48);
+  const z = sigma ? (wPlus - mu) / sigma : 0;
+  const p = Math.min(1, 2 * (1 - jStat.normal.cdf(Math.abs(z), 0, 1)));
+  return { W: Math.min(wPlus, (n * (n + 1)) / 2 - wPlus), z, p, n, r: Math.abs(z) / Math.sqrt(n) };
+}
+
+/** Spearman rank correlation with a t-approximation p-value. */
+export function spearman(x, y) {
+  const rx = rank(x).ranks;
+  const ry = rank(y).ranks;
+  const mx = mean(rx);
+  const my = mean(ry);
+  const cov = sum(rx.map((v, i) => (v - mx) * (ry[i] - my)));
+  const rho = cov / Math.sqrt(sum(rx.map((v) => (v - mx) ** 2)) * sum(ry.map((v) => (v - my) ** 2)));
+  const n = x.length;
+  const t = rho * Math.sqrt((n - 2) / Math.max(1e-12, 1 - rho * rho));
+  return { rho, p: 2 * (1 - jStat.studentt.cdf(Math.abs(t), n - 2)), n };
+}
+
 /** Holm–Bonferroni adjusted p-values (same order as input). */
 export function holm(ps) {
   const order = ps.map((p, i) => [p, i]).sort((a, b) => a[0] - b[0]);
@@ -203,6 +244,12 @@ if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` || proce
     // Kruskal–Wallis: scipy.stats.kruskal([1,2,3],[4,5,6],[7,8,9]) → H=7.2, p=0.02732
     ['kruskal H', close(kruskalWallis([[1, 2, 3], [4, 5, 6], [7, 8, 9]]).H, 7.2)],
     ['kruskal p', close(kruskalWallis([[1, 2, 3], [4, 5, 6], [7, 8, 9]]).p, 0.02732, 2e-4)],
+    // scipy.stats.wilcoxon(x, y, method='approx', correction=False) → p = 0.038152
+    ['wilcoxon signed-rank', close(wilcoxonSignedRank([1.83, 0.5, 1.62, 2.48, 1.68, 1.88, 1.55, 3.06, 1.3], [0.878, 0.647, 0.598, 2.05, 1.06, 1.29, 1.06, 3.14, 1.29]).p, 0.038152, 1e-5)],
+    // scipy.stats.t.interval(0.95, 2, loc=12, scale=sem([10,12,14])) → (7.0317, 16.9683)
+    ['t interval', close(tCI([10, 12, 14]).lo, 7.0317)],
+    // scipy.stats.spearmanr([1..5],[5,6,7,8,7]) → rho 0.82078, p 0.08859
+    ['spearman', close(spearman([1, 2, 3, 4, 5], [5, 6, 7, 8, 7]).rho, 0.82078) && close(spearman([1, 2, 3, 4, 5], [5, 6, 7, 8, 7]).p, 0.08859)],
     ['holm', JSON.stringify(holm([0.01, 0.04, 0.03]).map((v) => +v.toFixed(3))) === '[0.03,0.06,0.06]'],
   ];
   let failed = 0;

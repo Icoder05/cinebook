@@ -1,0 +1,11 @@
+run,lines,unparseable,ops,trials,opErrors
+main-web,57,0,25,20,0
+main-web-postfix,35,0,15,12,0
+main-ux-prefix,8,0,0,3,0
+main-ux-midfix,18,0,0,13,0
+main-ux,18,0,0,13,0
+main-scale,13936,0,13860,25,0
+main-reliability,101,0,0,49,0
+main-dbopt,624,0,600,8,0
+main-security,49,0,0,46,0
+main-recsim,24008,0,0,24000,0

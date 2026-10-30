@@ -1,0 +1,10 @@
+noise,comparison,n,z,p,r,mrr_gain,pHolm
+1,content_based vs default,1897,27.02,<1e-15,0.62,0.335,<1e-15
+1,content_based vs language_filter,1415,11.62,<1e-15,0.309,0.103,<1e-15
+1,content_based vs popularity,1777,25.75,<1e-15,0.611,0.29,<1e-15
+0.25,content_based vs default,1970,34.51,<1e-15,0.778,0.531,<1e-15
+0.25,content_based vs language_filter,1241,21.28,<1e-15,0.604,0.218,<1e-15
+0.25,content_based vs popularity,1677,31.97,<1e-15,0.781,0.419,<1e-15
+0.5,content_based vs default,1946,31.13,<1e-15,0.706,0.435,<1e-15
+0.5,content_based vs language_filter,1388,17.23,<1e-15,0.463,0.17,<1e-15
+0.5,content_based vs popularity,1646,29.99,<1e-15,0.739,0.35,<1e-15

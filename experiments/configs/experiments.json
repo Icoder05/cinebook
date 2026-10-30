@@ -114,6 +114,92 @@
       "title": "Live payment idempotency (double submit)",
       "parallelSubmits": 5,
       "trials": 6
+    },
+    "E8": {
+      "title": "Scalability: concurrent users vs latency, throughput and errors",
+      "users": [
+        10,
+        50,
+        100,
+        500
+      ],
+      "repeats": 3,
+      "readRequestsPerUser": 5,
+      "writeOpsPerUser": 1,
+      "pauseBetweenCellsSec": 10,
+      "workloads": [
+        "read: seat map",
+        "write: hold + release on distinct seats"
+      ]
+    },
+    "E9": {
+      "title": "Seat-lock and transaction reliability under failure injection",
+      "trialsPerScenario": 8,
+      "scenarios": [
+        "declined_card",
+        "bank_timeout_client_abort_retry",
+        "network_abort_retry",
+        "hold_expires_mid_payment",
+        "expired_hold_reclaimed",
+        "partial_multi_seat_rollback"
+      ],
+      "clientAbortSec": 8,
+      "networkAbortMs": 300
+    }
+  },
+  "web": {
+    "E6": {
+      "title": "Public-page web performance, accessibility and responsiveness vs BookMyShow and District",
+      "pages": [
+        "CineBook home",
+        "CineBook movie",
+        "CineBook seat map",
+        "BookMyShow explore/home (Bengaluru)",
+        "District /movies/"
+      ],
+      "loadsPerPage": 5,
+      "spacingSec": 4,
+      "axeTags": [
+        "wcag2a",
+        "wcag2aa",
+        "wcag21a",
+        "wcag21aa",
+        "wcag22aa"
+      ],
+      "widths": [
+        360,
+        768,
+        1440
+      ],
+      "ethics": "robots.txt-permitted public pages only; no login, holds or checkout on competitors; no bot-protection evasion"
+    }
+  },
+  "offline": {
+    "E10": {
+      "title": "Database optimisation: indexes, normalisation and plans on a synthetic 1M-row seat table",
+      "showtimes": 5000,
+      "seatsPerShowtime": 200,
+      "bookings": 200000,
+      "repsPerQuery": 30,
+      "schema": "research (dropped afterwards)"
+    },
+    "E11": {
+      "title": "Security test suite mapped to OWASP API Security Top 10 (2023)",
+      "target": "local API on PGlite + live security headers"
+    },
+    "E12": {
+      "title": "Offline recommender simulation for discovery efficiency",
+      "personas": 2000,
+      "k": [
+        3,
+        5
+      ],
+      "policies": [
+        "default order",
+        "popularity",
+        "content-based (language+genre)"
+      ],
+      "note": "simulation with synthetic personas, not user data"
     }
   }
 }

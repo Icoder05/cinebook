@@ -1,0 +1,9 @@
+object,size_mb
+show_seats heap,64.84
+"PK (showtime_id, seat_id)",38.76
+full index (hold_expires_at),6.86
+partial index WHERE status='HELD',0.34
+bookings (user_id),2.91
+"bookings (user_id, created_at DESC)",7.77
+normalised total (incl. indexes),107.92
+denormalised total (incl. indexes),129.09

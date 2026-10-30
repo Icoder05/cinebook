@@ -1,0 +1,16 @@
+site,page,width,overflow_px
+CineBook,home,360,0
+CineBook,home,768,0
+CineBook,home,1440,0
+CineBook,movie,360,0
+CineBook,movie,768,0
+CineBook,movie,1440,0
+CineBook,seat map,360,0
+CineBook,seat map,768,0
+CineBook,seat map,1440,0
+BookMyShow,home,360,0
+BookMyShow,home,768,0
+BookMyShow,home,1440,0
+District,movies home,360,0
+District,movies home,768,0
+District,movies home,1440,0

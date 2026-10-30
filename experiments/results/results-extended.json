@@ -1,0 +1,627 @@
+{
+  "E6": {
+    "pages": 5,
+    "loads": 25,
+    "homeTests": {
+      "lcpMs": {
+        "H": 1.52,
+        "df": 2,
+        "p": 0.4677,
+        "pairwise": [
+          {
+            "a": "CineBook",
+            "b": "BookMyShow",
+            "p": 0.6761,
+            "pHolm": 1,
+            "cliffs": -0.2
+          },
+          {
+            "a": "CineBook",
+            "b": "District",
+            "p": 0.1437,
+            "pHolm": 0.431,
+            "cliffs": -0.6
+          },
+          {
+            "a": "BookMyShow",
+            "b": "District",
+            "p": 0.8345,
+            "pHolm": 1,
+            "cliffs": 0.12
+          }
+        ]
+      },
+      "transferKB": {
+        "H": 12.635,
+        "df": 2,
+        "p": 0.0018,
+        "pairwise": [
+          {
+            "a": "CineBook",
+            "b": "BookMyShow",
+            "p": 0.0109,
+            "pHolm": 0.032,
+            "cliffs": -1
+          },
+          {
+            "a": "CineBook",
+            "b": "District",
+            "p": 0.0107,
+            "pHolm": 0.032,
+            "cliffs": -1
+          },
+          {
+            "a": "BookMyShow",
+            "b": "District",
+            "p": 0.0119,
+            "pHolm": 0.032,
+            "cliffs": 1
+          }
+        ]
+      },
+      "requests": {
+        "H": 9.963,
+        "df": 2,
+        "p": 0.0069,
+        "pairwise": [
+          {
+            "a": "CineBook",
+            "b": "BookMyShow",
+            "p": 0.0073,
+            "pHolm": 0.0195,
+            "cliffs": -1
+          },
+          {
+            "a": "CineBook",
+            "b": "District",
+            "p": 0.0065,
+            "pHolm": 0.0195,
+            "cliffs": -1
+          },
+          {
+            "a": "BookMyShow",
+            "b": "District",
+            "p": 0.6704,
+            "pHolm": 0.6704,
+            "cliffs": -0.2
+          }
+        ]
+      }
+    },
+    "postFixPerf": [
+      {
+        "key": "CineBook · home",
+        "lcp_mean_ms": 920.8,
+        "transfer_kb": 695.8
+      },
+      {
+        "key": "CineBook · movie",
+        "lcp_mean_ms": 1076,
+        "transfer_kb": 338
+      },
+      {
+        "key": "CineBook · seat map",
+        "lcp_mean_ms": 493.6,
+        "transfer_kb": 212.7
+      }
+    ],
+    "overflowAny": false
+  },
+  "E7": {
+    "devices": [
+      {
+        "device": "desktop",
+        "n": 5,
+        "screens_mean": 7.2,
+        "screens_min": 7,
+        "screens_max": 8,
+        "dialogs": 2,
+        "clicks": 17,
+        "keystrokes": 77,
+        "form_fields": 6,
+        "robot_sec_mean": 4.52,
+        "robot_sec_sd": 0.32,
+        "robot_ci_lo": 4.12,
+        "robot_ci_hi": 4.91,
+        "klm_total_sec": 71.4,
+        "klm_after_signin_sec": 49.8,
+        "klm_checkout_sec": 28.6,
+        "stage_signin_s": 1.05,
+        "stage_discovery_s": 0.06,
+        "stage_showtime_s": 0.52,
+        "stage_seats_s": 0.67,
+        "stage_checkout_s": 2.21,
+        "fee_breakdown_before_pay": true,
+        "seat_retries": 0
+      },
+      {
+        "device": "mobile",
+        "n": 5,
+        "screens_mean": 7.2,
+        "screens_min": 7,
+        "screens_max": 8,
+        "dialogs": 2,
+        "clicks": 17,
+        "keystrokes": 77,
+        "form_fields": 6,
+        "robot_sec_mean": 4.73,
+        "robot_sec_sd": 0.26,
+        "robot_ci_lo": 4.4,
+        "robot_ci_hi": 5.05,
+        "klm_total_sec": 71.4,
+        "klm_after_signin_sec": 49.8,
+        "klm_checkout_sec": 28.6,
+        "stage_signin_s": 1.06,
+        "stage_discovery_s": 0.06,
+        "stage_showtime_s": 0.5,
+        "stage_seats_s": 0.78,
+        "stage_checkout_s": 2.32,
+        "fee_breakdown_before_pay": true,
+        "seat_retries": 0
+      }
+    ],
+    "desktopVsMobileRobotP": 0.6004,
+    "keyboard": [
+      {
+        "phase": "1 before fixes",
+        "completed": 0,
+        "n": 3,
+        "tabsMean": null
+      },
+      {
+        "phase": "2 toast trap fixed",
+        "completed": 0,
+        "n": 3,
+        "tabsMean": null
+      },
+      {
+        "phase": "3 all fixes",
+        "completed": 3,
+        "n": 3,
+        "tabsMean": 100
+      }
+    ]
+  },
+  "E8": {
+    "totalRequests": 13860,
+    "totalErrors": 0,
+    "errorCI": [
+      0,
+      0.0003
+    ],
+    "tests": {
+      "read": {
+        "spearmanUsersVsP95": {
+          "rho": 0.842,
+          "p": 0.0006,
+          "n": 12
+        },
+        "kruskalLatencyByUsers": {
+          "H": 2595.6,
+          "df": 3,
+          "p": "<1e-15"
+        }
+      },
+      "write": {
+        "spearmanUsersVsP95": {
+          "rho": 0.972,
+          "p": "1.4e-7",
+          "n": 12
+        },
+        "kruskalLatencyByUsers": {
+          "H": 1043.5,
+          "df": 3,
+          "p": "<1e-15"
+        }
+      }
+    },
+    "invariants": {
+      "runId": "main-scale",
+      "seq": 13933,
+      "ts": "2026-10-30T17:51:41.814Z",
+      "type": "trial",
+      "exp": "E9-invariants",
+      "strategy": "database",
+      "trial": 0,
+      "booked_without_confirmed": 0,
+      "double_charged_bookings": 0,
+      "confirmed_seat_mismatch": 0,
+      "held_without_hold": 0
+    }
+  },
+  "E9": {
+    "trials": 48,
+    "passed": 48,
+    "passCI": [
+      0.9259,
+      1
+    ],
+    "ruleOfThreeFailureUpper": 0.0625,
+    "invariants": {
+      "runId": "main-reliability",
+      "seq": 98,
+      "ts": "2026-10-30T17:46:25.244Z",
+      "type": "trial",
+      "exp": "E9-invariants",
+      "strategy": "database",
+      "trial": 0,
+      "booked_without_confirmed": 0,
+      "double_charged_bookings": 0,
+      "confirmed_seat_mismatch": 0,
+      "held_without_hold": 0
+    }
+  },
+  "E10": {
+    "dataset": {
+      "runId": "main-dbopt",
+      "seq": 1,
+      "ts": "2026-10-30T17:52:36.928Z",
+      "type": "dataset",
+      "ss": 1000000,
+      "b": 200000,
+      "held": 15000,
+      "expired": 7609,
+      "heapMB": 64.84375
+    },
+    "tests": [
+      {
+        "query": "seat map",
+        "baseline": "no index (seq scan)",
+        "variant": "PK (showtime_id, seat_id)",
+        "p": "3.0e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "hold (2 seats)",
+        "baseline": "no index (seq scan)",
+        "variant": "PK (showtime_id, seat_id)",
+        "p": "3.0e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "expiry sweep",
+        "baseline": "no index",
+        "variant": "full index",
+        "p": "3.0e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "expiry sweep",
+        "baseline": "no index",
+        "variant": "partial index (HELD only)",
+        "p": "5.6e-10",
+        "cliffs": 0.933,
+        "pHolm": "2.2e-9"
+      },
+      {
+        "query": "my bookings",
+        "baseline": "no index",
+        "variant": "index (user_id)",
+        "p": "2.9e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "my bookings",
+        "baseline": "no index",
+        "variant": "composite (user_id, created_at)",
+        "p": "2.9e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "seat map + layout",
+        "baseline": "normalised (3-table join)",
+        "variant": "denormalised (1 table)",
+        "p": "3.0e-11",
+        "cliffs": 1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "tier price change",
+        "baseline": "normalised",
+        "variant": "denormalised",
+        "p": "3.0e-11",
+        "cliffs": -1,
+        "pHolm": "3.5e-10"
+      },
+      {
+        "query": "insert 10k seats",
+        "baseline": "PK only",
+        "variant": "PK + partial",
+        "p": 0.0007,
+        "cliffs": -0.513,
+        "pHolm": 0.002
+      },
+      {
+        "query": "insert 10k seats",
+        "baseline": "PK only",
+        "variant": "PK + 4 secondary",
+        "p": "3.5e-10",
+        "cliffs": -0.944,
+        "pHolm": "1.7e-9"
+      },
+      {
+        "query": "hold txn (client RTT)",
+        "baseline": "READ COMMITTED",
+        "variant": "REPEATABLE READ",
+        "p": 0.7788,
+        "cliffs": 0.043,
+        "pHolm": 1
+      },
+      {
+        "query": "hold txn (client RTT)",
+        "baseline": "READ COMMITTED",
+        "variant": "SERIALIZABLE",
+        "p": 0.5249,
+        "cliffs": 0.097,
+        "pHolm": 1
+      }
+    ],
+    "sizes": [
+      {
+        "object": "show_seats heap",
+        "size_mb": 64.84
+      },
+      {
+        "object": "PK (showtime_id, seat_id)",
+        "size_mb": 38.76
+      },
+      {
+        "object": "full index (hold_expires_at)",
+        "size_mb": 6.86
+      },
+      {
+        "object": "partial index WHERE status='HELD'",
+        "size_mb": 0.34
+      },
+      {
+        "object": "bookings (user_id)",
+        "size_mb": 2.91
+      },
+      {
+        "object": "bookings (user_id, created_at DESC)",
+        "size_mb": 7.77
+      },
+      {
+        "object": "normalised total (incl. indexes)",
+        "size_mb": 107.92
+      },
+      {
+        "object": "denormalised total (incl. indexes)",
+        "size_mb": 129.09
+      }
+    ]
+  },
+  "E11": {
+    "checks": 46,
+    "passed": 46,
+    "categories": [
+      {
+        "category": "API1",
+        "checks": 5,
+        "passed": 5
+      },
+      {
+        "category": "API2",
+        "checks": 14,
+        "passed": 14
+      },
+      {
+        "category": "API3",
+        "checks": 4,
+        "passed": 4
+      },
+      {
+        "category": "API4",
+        "checks": 3,
+        "passed": 3
+      },
+      {
+        "category": "API5",
+        "checks": 3,
+        "passed": 3
+      },
+      {
+        "category": "API6",
+        "checks": 4,
+        "passed": 4
+      },
+      {
+        "category": "INJ",
+        "checks": 4,
+        "passed": 4
+      },
+      {
+        "category": "API8",
+        "checks": 7,
+        "passed": 7
+      },
+      {
+        "category": "DATA",
+        "checks": 2,
+        "passed": 2
+      }
+    ]
+  },
+  "E12": {
+    "personasPerNoise": 2000,
+    "tests": [
+      {
+        "noise": 1,
+        "comparison": "content_based vs default",
+        "n": 1897,
+        "z": 27.02,
+        "p": "<1e-15",
+        "r": 0.62,
+        "mrr_gain": 0.335,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 1,
+        "comparison": "content_based vs language_filter",
+        "n": 1415,
+        "z": 11.62,
+        "p": "<1e-15",
+        "r": 0.309,
+        "mrr_gain": 0.103,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 1,
+        "comparison": "content_based vs popularity",
+        "n": 1777,
+        "z": 25.75,
+        "p": "<1e-15",
+        "r": 0.611,
+        "mrr_gain": 0.29,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.25,
+        "comparison": "content_based vs default",
+        "n": 1970,
+        "z": 34.51,
+        "p": "<1e-15",
+        "r": 0.778,
+        "mrr_gain": 0.531,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.25,
+        "comparison": "content_based vs language_filter",
+        "n": 1241,
+        "z": 21.28,
+        "p": "<1e-15",
+        "r": 0.604,
+        "mrr_gain": 0.218,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.25,
+        "comparison": "content_based vs popularity",
+        "n": 1677,
+        "z": 31.97,
+        "p": "<1e-15",
+        "r": 0.781,
+        "mrr_gain": 0.419,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.5,
+        "comparison": "content_based vs default",
+        "n": 1946,
+        "z": 31.13,
+        "p": "<1e-15",
+        "r": 0.706,
+        "mrr_gain": 0.435,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.5,
+        "comparison": "content_based vs language_filter",
+        "n": 1388,
+        "z": 17.23,
+        "p": "<1e-15",
+        "r": 0.463,
+        "mrr_gain": 0.17,
+        "pHolm": "<1e-15"
+      },
+      {
+        "noise": 0.5,
+        "comparison": "content_based vs popularity",
+        "n": 1646,
+        "z": 29.99,
+        "p": "<1e-15",
+        "r": 0.739,
+        "mrr_gain": 0.35,
+        "pHolm": "<1e-15"
+      }
+    ]
+  },
+  "dataQuality": [
+    {
+      "run": "main-web",
+      "lines": 57,
+      "unparseable": 0,
+      "ops": 25,
+      "trials": 20,
+      "opErrors": 0
+    },
+    {
+      "run": "main-web-postfix",
+      "lines": 35,
+      "unparseable": 0,
+      "ops": 15,
+      "trials": 12,
+      "opErrors": 0
+    },
+    {
+      "run": "main-ux-prefix",
+      "lines": 8,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 3,
+      "opErrors": 0
+    },
+    {
+      "run": "main-ux-midfix",
+      "lines": 18,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 13,
+      "opErrors": 0
+    },
+    {
+      "run": "main-ux",
+      "lines": 18,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 13,
+      "opErrors": 0
+    },
+    {
+      "run": "main-scale",
+      "lines": 13936,
+      "unparseable": 0,
+      "ops": 13860,
+      "trials": 25,
+      "opErrors": 0
+    },
+    {
+      "run": "main-reliability",
+      "lines": 101,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 49,
+      "opErrors": 0
+    },
+    {
+      "run": "main-dbopt",
+      "lines": 624,
+      "unparseable": 0,
+      "ops": 600,
+      "trials": 8,
+      "opErrors": 0
+    },
+    {
+      "run": "main-security",
+      "lines": 49,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 46,
+      "opErrors": 0
+    },
+    {
+      "run": "main-recsim",
+      "lines": 24008,
+      "unparseable": 0,
+      "ops": 0,
+      "trials": 24000,
+      "opErrors": 0
+    }
+  ]
+}

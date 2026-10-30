@@ -25,7 +25,7 @@ the analysis reads that file and flags any cell whose trial count differs from t
 | **Repetitions** | 20 trials per cell (E1), 15 (E2, E5), 6 × 5 holds per client (E3); one extra warm-up trial per cell, logged but excluded |
 | **Randomisation** | cells execute in a seeded random order (setup randomisation against time-of-day drift); seat choices and request orders derive from a fixed seed (`20261025`) |
 | **Analysis** | medians and 95th percentiles with percentile-bootstrap CIs; Wilson intervals for proportions; rule of three for zero-event outcomes; Fisher's exact test; Kruskal–Wallis, then Mann–Whitney U with Holm correction; Cliff's δ effect sizes |
-| **Validation** | statistics module self-test against 12 published reference values; full independent recomputation in SciPy/Statsmodels (`notebooks/04_statistical_analysis.ipynb`, 154/154 quantities agree); data-completeness check against this design |
+| **Validation** | statistics module self-test against 15 published or SciPy reference values (including Wilcoxon signed-rank, Student-t interval and Spearman); full independent recomputation in SciPy/Statsmodels (`notebooks/04_statistical_analysis.ipynb`, 154/154 quantities agree); data-completeness check against this design |
 
 ## Experiments
 
@@ -36,6 +36,21 @@ the analysis reads that file and flags any cell whose trial count differs from t
 | E3 | cost without collisions (latency, throughput) | each client books its own seats, 5 sequential holds | 6 | 1, 16 | 6 |
 | E4 | the deployed system, end to end over HTTPS | read latency (3 rounds × 40 samples × 4 endpoints); 16-user race for one seat; 5 parallel payment submits with one idempotency key | production code | 1 / 16 / 5 | 3 / 12 / 6 |
 | E5 | **platform sensitivity** | as E1 | 3 | 8 | 15 |
+
+### Extended study (E6–E12)
+
+| ID | Area | Procedure | Replication |
+|---|---|---|---|
+| E6 | web performance, WCAG 2.2 AA, responsiveness vs BookMyShow and District | cold-cache Chromium loads of robots.txt-permitted public pages; axe-core; overflow at 360/768/1440 px | 5 loads per page, 4 s apart; re-audit after fixes |
+| E7 | booking funnel, usability, keyboard access | instrumented booking (screens, clicks, keystrokes, time); Keystroke-Level Model; keyboard-only booking | 5 desktop + 5 mobile + 3 keyboard runs |
+| E8 | scalability | 10/50/100/500 simultaneous users; read and write workloads on the live site | 3 repeats, randomised cell order |
+| E9 | seat locking and transaction reliability | declined card, bank time-out + retry, dropped connection + retry, hold expiry during payment, expired-hold reclaim, partial multi-seat rollback; DB invariants | 8 trials each, randomised |
+| E10 | database optimisation | 1 M show-seat rows; primary key, partial and composite indexes, denormalisation, index write cost, isolation level; EXPLAIN ANALYZE | 30 runs after 3 warm-ups |
+| E11 | security | 46 checks mapped to the OWASP API Security Top 10 (2023) | deterministic, 1 run |
+| E12 | discovery | 2 000 synthetic personas × 4 ranking policies × 3 noise levels; HR@3, MRR, NDCG@5; paired Wilcoxon | simulation, seeded |
+
+Competitor data come only from public pages, with no accounts, holds, checkout or bot-protection bypass. SUS and
+competitor funnels need human participants; the protocol and scoring script are in `experiments/ux/`.
 
 ## Strategies (the treatments)
 

@@ -1,0 +1,6 @@
+{
+  "runId": "main-security",
+  "startedAt": "2026-10-30T17:49:40.271Z",
+  "target": "local API on in-memory PGlite + live headers",
+  "standard": "OWASP API Security Top 10 (2023)"
+}

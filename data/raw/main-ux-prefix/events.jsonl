@@ -1,0 +1,8 @@
+{"runId":"main-ux","seq":0,"ts":"2026-10-30T18:05:04.807Z","type":"run_start","totalCells":3}
+{"runId":"main-ux","seq":1,"ts":"2026-10-30T18:05:04.807Z","type":"cell_start","exp":"E7","strategy":"CineBook desktop","c":1}
+{"runId":"main-ux","seq":2,"ts":"2026-10-30T18:05:04.807Z","type":"cell_start","exp":"E7","strategy":"CineBook mobile","c":1}
+{"runId":"main-ux","seq":3,"ts":"2026-10-30T18:05:04.807Z","type":"cell_start","exp":"E7-keyboard","strategy":"keyboard-only","c":1}
+{"runId":"main-ux","seq":4,"ts":"2026-10-30T18:05:10.596Z","type":"trial","exp":"E7-keyboard","strategy":"CineBook keyboard-only","c":1,"trial":0,"completed":false,"tabs":450,"stops":4,"invisibleFocus":0,"failedAt":"Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)","robotSec":1.85}
+{"runId":"main-ux","seq":5,"ts":"2026-10-30T18:05:16.183Z","type":"trial","exp":"E7-keyboard","strategy":"CineBook keyboard-only","c":1,"trial":1,"completed":false,"tabs":456,"stops":4,"invisibleFocus":0,"failedAt":"Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)","robotSec":1.66}
+{"runId":"main-ux","seq":6,"ts":"2026-10-30T18:05:21.930Z","type":"trial","exp":"E7-keyboard","strategy":"CineBook keyboard-only","c":1,"trial":2,"completed":false,"tabs":474,"stops":4,"invisibleFocus":0,"failedAt":"Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)","robotSec":1.7}
+{"runId":"main-ux","seq":7,"ts":"2026-10-30T18:05:23.164Z","type":"run_end","finishedAt":"2026-10-30T18:05:23.164Z"}

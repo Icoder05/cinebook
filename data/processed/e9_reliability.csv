@@ -1,0 +1,7 @@
+scenario,n,passed,pass_ci_lo,pass_ci_hi,charges_total,refunds_total,latency_mean_ms,latency_sd_ms,recovery_mean_ms,recovery_sd_ms,retries_mean,final_states
+hold_expires_mid_payment,8,8,0.676,1,0,8,1639,14.8,,,,EXPIRED/AVAILABLE
+partial_multi_seat_rollback,8,8,0.676,1,0,0,135.3,33.7,,,,-/AVAILABLE/AVAILABLE
+network_abort_retry,8,8,0.676,1,8,0,303.7,4.7,1560.9,56.4,3,CONFIRMED/BOOKED
+declined_card,8,8,0.676,1,0,0,1639.5,7,,,,FAILED/AVAILABLE
+bank_timeout_client_abort_retry,8,8,0.676,1,8,0,8007.8,3.9,305.9,62.7,1,CONFIRMED/BOOKED
+expired_hold_reclaimed,8,8,0.676,1,0,0,156.1,50.2,,,,-/HELD

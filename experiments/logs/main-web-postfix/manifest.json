@@ -1,0 +1,24 @@
+{
+  "runId": "main-web-postfix",
+  "startedAt": "2026-10-30T18:28:10.932Z",
+  "loadsPerPage": 5,
+  "pages": [
+    {
+      "site": "CineBook",
+      "page": "home",
+      "url": "https://cinebook-eight-chi.vercel.app/"
+    },
+    {
+      "site": "CineBook",
+      "page": "movie",
+      "url": "https://cinebook-eight-chi.vercel.app/movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456"
+    },
+    {
+      "site": "CineBook",
+      "page": "seat map",
+      "url": "https://cinebook-eight-chi.vercel.app/showtimes/63fcb788-a3a3-4af7-abb4-d6f3826e4fd2/seats"
+    }
+  ],
+  "method": "Chromium (Playwright), desktop 1366x860, cold HTTP cache per load, no CPU/network throttling; client in India",
+  "finishedAt": "2026-10-30T18:30:55.887Z"
+}

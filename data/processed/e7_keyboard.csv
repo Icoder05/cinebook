@@ -1,0 +1,10 @@
+phase,trial,completed,tabs,tabs_seat_map,stops,invisible_focus,failed_at
+1 before fixes,0,false,450,,4,0,Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)
+1 before fixes,1,false,456,,4,0,Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)
+1 before fixes,2,false,474,,4,0,Book tickets (stuck at /movies/767ecd50-0ce1-4723-9b0c-1cbe51dca456 @ LI.Welcome back!)
+2 toast trap fixed,0,false,610,,11,0,Card number (stuck at /pay/b09abd28-31bc-4d4e-adf3-ff8ce238fa7f @ BODY.TEST MODE — no real money. Use the test )
+2 toast trap fixed,1,false,483,,9,0,"Pay button (stuck at /showtimes/63fcb788-a3a3-4af7-abb4-d6f3826e4fd2/seats @ BUTTON.Row K seat 15, Recliner ₹550, available)"
+2 toast trap fixed,2,false,488,,9,0,"Pay button (stuck at /showtimes/63fcb788-a3a3-4af7-abb4-d6f3826e4fd2/seats @ BUTTON.Row K seat 15, Recliner ₹550, available)"
+3 all fixes,0,true,94,4,16,0,
+3 all fixes,1,true,116,4,16,0,
+3 all fixes,2,true,90,4,16,0,

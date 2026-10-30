@@ -1,0 +1,47 @@
+owasp,id,test,expected,observed,pass,note
+API1,bola-read-booking,User B reads user A's booking,403/404,404,true,
+API1,bola-cancel-booking,User B cancels user A's booking,403/404,404,true,
+API1,bola-pay-other-hold,User B pays for user A's hold,403/404,403,true,
+API1,bola-release-other-hold,User B releases user A's hold,404,404,true,
+API1,bola-guess-id,Random booking UUID,404,404,true,ids are random v4 UUIDs (122 bits)
+API2,no-token,Protected route without token,401,401,true,
+API2,tampered-claims,"Payload edited to role=admin, old signature",401,401,true,
+API2,alg-none,Unsigned token (alg=none),401,401,true,
+API2,wrong-key,Token signed with a different secret,401,401,true,
+API2,expired-token,Correctly signed but expired token,401,401,true,
+API2,refresh-rotation,Refresh once (rotation),200 + new token,"200, rotated=true",true,
+API2,refresh-race-window,Replay old refresh token within 10 s,401 REFRESH_RACE,401 REFRESH_RACE,true,grace window for parallel tabs
+API2,refresh-reuse,Replay old refresh token after 11 s,401 REFRESH_REUSED,401 REFRESH_REUSED,true,
+API2,refresh-family-revoked,Newest token after reuse was detected,401 (family revoked),401,true,
+API2,user-enumeration,Unknown e-mail vs wrong password,same status + message,"401/401, same msg=true",true,
+API2,brute-force-limit,7 wrong passwords in a row (per IP+email),429 by attempt 6,"401,401,401,401,429,429,429",true,one attempt was already used by the enumeration test
+API2,weak-password,Signup with digits-only password,422,422,true,
+API2,logout-money-routes,Pay with an access token after logout,401,401,true,pay/cancel re-check the session row
+API2,logout-read-routes,Read /me with an access token after logout,401 ideal; 200 accepted (≤15 min),200,true,documented trade-off: stateless JWT stays valid for read routes until expiry (15 min)
+API3,mass-assign-role,Signup body includes role=admin,role=customer,customer,true,
+API3,mass-assign-profile,PATCH /me with role and email,role/email unchanged,"customer, mass@test.dev",true,
+API3,excessive-exposure,Profile response fields,no password hash,id|name|email|phone|role|createdAt,true,
+API3,card-data-in-response,Booking/payment responses,no full PAN,last 4 only,true,
+API4,body-size-limit,150 KB JSON body,413,413,true,
+API4,page-size-limit,limit=100000 on movie list,422 (max 60),422,true,
+API4,hold-size-limit,Hold 11 seats in one request,422 (max 10),422,true,stops one user locking a whole row
+API5,customer-admin-read,Customer calls GET /admin/stats,403,403,true,
+API5,customer-admin-write,Customer calls admin auto-schedule,403,403,true,
+API5,customer-ticket-scan,Customer calls ticket check-in,403,403,true,
+API6,qr-forged-signature,Ticket with a made-up signature,BAD_SIGNATURE,BAD_SIGNATURE,true,
+API6,qr-malformed,Ticket missing its signature,MALFORMED,MALFORMED,true,
+API6,qr-code-only,Booking code alone (pre-fix QR content),rejected,MALFORMED,true,
+API6,qr-genuine-once,Genuine ticket scanned twice,VALID then ALREADY_CHECKED_IN,"VALID, ALREADY_CHECKED_IN",true,
+INJ,sqli-search,Search q=' OR 1=1 --,"200, 0 rows, no SQL error","200, 0 rows",true,Drizzle binds parameters
+INJ,sqli-login,Login e-mail with ' --,401/422,422,true,
+INJ,sqli-path,"Path id = ""1; DROP TABLE users""",422,422,true,ids validated as UUIDs before any query
+INJ,stored-xss,Name containing an <img onerror> payload,stored as text; JSON; CSP blocks inline,"200, application/json; charset=utf-8",true,React escapes text; script-src self
+API8,hsts,Strict-Transport-Security (live),present,present,true,
+API8,csp,Content-Security-Policy (live API),present,present,true,
+API8,nosniff,X-Content-Type-Options (live),nosniff,nosniff,true,
+API8,framing,Clickjacking protection (live),frame-ancestors or X-Frame-Options,SAMEORIGIN,true,
+API8,powered-by,X-Powered-By leaked (live),absent,absent,true,
+API8,cors-foreign-origin,Request from https://evil.example (live),origin not reflected,no ACAO header,true,
+API8,error-leak,Bad input error body (live),no stack trace / SQL,"422, clean",true,
+DATA,no-cvv-pan-columns,Columns named cvv/pan/card_number/expiry (live DB),none,none,true,
+DATA,pan-at-rest,"Payment rows with ≥8 consecutive digits (n=1, live DB)",0,0,true,"only ""•••• 1234"" is stored"

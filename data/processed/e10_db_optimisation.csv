@@ -1,0 +1,21 @@
+query,variant,n,mean_ms,sd_ms,ci_lo,ci_hi,median_ms,p95_ms,speedup_vs_first,plan
+seat map,no index (seq scan),30,53.905,3.782,52.493,55.317,52.493,61.205,1,Gather > Seq Scan
+seat map,"PK (showtime_id, seat_id)",30,0.342,0.021,0.335,0.35,0.339,0.356,155.074,Bitmap Heap Scan > Bitmap Index Scan:show_seats_pkey
+hold (2 seats),no index (seq scan),30,53.603,2.269,52.756,54.451,52.919,56.881,1,ModifyTable > Seq Scan
+hold (2 seats),"PK (showtime_id, seat_id)",30,0.116,0.013,0.111,0.121,0.116,0.129,456.194,ModifyTable > Index Scan:show_seats_pkey
+expiry sweep,no index,30,97.52,8.653,94.289,100.751,93.968,114.877,1,ModifyTable > Seq Scan
+expiry sweep,full index,30,57.924,9.324,54.443,61.406,54.457,78.952,1.726,ModifyTable > Index Scan:ss_exp_full
+expiry sweep,partial index (HELD only),30,56.156,19.734,48.788,63.525,49.537,74.386,1.897,ModifyTable > Index Scan:ss_exp_partial
+my bookings,no index,30,15.963,6.145,13.668,18.257,14.32,19.103,1,Limit > Gather Merge > Sort > Seq Scan
+my bookings,index (user_id),30,0.074,0.01,0.071,0.078,0.074,0.087,193.514,Limit > Sort > Index Scan:b_user
+my bookings,"composite (user_id, created_at)",30,0.069,0.006,0.066,0.071,0.068,0.081,210.588,Limit > Index Scan:b_user_created
+seat map + layout,normalised (3-table join),30,6.687,0.171,6.623,6.751,6.639,7.012,1,Hash Join > Hash Join > Seq Scan > Hash > Bitmap Heap Scan > Bitmap Index Scan:show_seats_pkey > Hash > Seq Scan
+seat map + layout,denormalised (1 table),30,0.813,0.075,0.786,0.841,0.822,0.926,8.077,Bitmap Heap Scan > Bitmap Index Scan:show_seats_denorm_pkey
+tier price change,normalised,30,0.127,0.014,0.122,0.133,0.124,0.136,1,ModifyTable > Seq Scan
+tier price change,denormalised,30,39.041,28.395,28.438,49.643,32.944,43.355,0.004,ModifyTable > Nested Loop > Seq Scan > Bitmap Heap Scan > Bitmap Index Scan:show_seats_denorm_pkey
+insert 10k seats,PK only,30,25.334,7.898,22.385,28.283,22.741,34.909,1,ModifyTable > Nested Loop > Function Scan > Function Scan
+insert 10k seats,PK + partial,30,24.544,1.768,23.884,25.204,23.692,28.181,0.96,ModifyTable > Nested Loop > Function Scan > Function Scan
+insert 10k seats,PK + 4 secondary,30,58.391,8.02,55.396,61.385,56.721,76.054,0.401,ModifyTable > Nested Loop > Function Scan > Function Scan
+hold txn (client RTT),READ COMMITTED,30,248.47,11.537,244.162,252.778,246.12,265.132,1,
+hold txn (client RTT),REPEATABLE READ,30,248.858,15.259,243.16,254.555,244.925,269.652,1.005,
+hold txn (client RTT),SERIALIZABLE,30,245.825,8.557,242.63,249.021,245.01,260.435,1.005,

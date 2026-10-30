@@ -1,0 +1,41 @@
+{
+  "runId": "main-reliability",
+  "startedAt": "2026-10-30T17:43:57.474Z",
+  "baseUrl": "https://cinebook-eight-chi.vercel.app",
+  "design": {
+    "E8": {
+      "title": "Scalability: concurrent users vs latency, throughput and errors",
+      "users": [
+        10,
+        50,
+        100,
+        500
+      ],
+      "repeats": 3,
+      "readRequestsPerUser": 5,
+      "writeOpsPerUser": 1,
+      "pauseBetweenCellsSec": 10,
+      "workloads": [
+        "read: seat map",
+        "write: hold + release on distinct seats"
+      ]
+    },
+    "E9": {
+      "title": "Seat-lock and transaction reliability under failure injection",
+      "trialsPerScenario": 8,
+      "scenarios": [
+        "declined_card",
+        "bank_timeout_client_abort_retry",
+        "network_abort_retry",
+        "hold_expires_mid_payment",
+        "expired_hold_reclaimed",
+        "partial_multi_seat_rollback"
+      ],
+      "clientAbortSec": 8,
+      "networkAbortMs": 300
+    }
+  },
+  "only": "E9",
+  "client": "Node.js fetch (undici), single client machine in India → Vercel (sin1) → Neon ap-southeast-1",
+  "finishedAt": "2026-10-30T17:46:26.012Z"
+}

@@ -1,0 +1,61 @@
+{
+  "runId": "main-recsim",
+  "startedAt": "2026-10-30T17:51:04.679Z",
+  "design": {
+    "title": "Offline recommender simulation for discovery efficiency",
+    "personas": 2000,
+    "k": [
+      3,
+      5
+    ],
+    "policies": [
+      "default order",
+      "popularity",
+      "content-based (language+genre)"
+    ],
+    "note": "simulation with synthetic personas, not user data"
+  },
+  "films": 12,
+  "genres": [
+    "Thriller",
+    "Drama",
+    "Mystery",
+    "Crime",
+    "Action",
+    "Fantasy",
+    "Comedy",
+    "History",
+    "Romance",
+    "Music",
+    "Family"
+  ],
+  "langMix": [
+    [
+      "Hindi",
+      0.35
+    ],
+    [
+      "Telugu",
+      0.17
+    ],
+    [
+      "Tamil",
+      0.15
+    ],
+    [
+      "English",
+      0.13
+    ],
+    [
+      "Malayalam",
+      0.1
+    ],
+    [
+      "Kannada",
+      0.1
+    ]
+  ],
+  "cardsPerRow": 2,
+  "nature": "simulation (synthetic personas)",
+  "finishedAt": "2026-10-30T17:51:04.883Z"
+}
