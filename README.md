@@ -1,257 +1,235 @@
-# CineBook — a BookMyShow clone
+# CineBook — preventing double bookings under concurrent demand
 
-Browse currently-running movies, pick a city, theatre and showtime, choose seats on a live
-seat map, pay through a simulated gateway and get an e-ticket with a QR code.
-
-**The one thing this project proves: two users can never book the same seat.** Postgres —
-not the Node process — decides who wins, and a test fires 50 concurrent requests at one
-seat and asserts exactly 1 success and 49 × `409`.
+**A BookMyShow-style ticket-booking system, and a reproducible empirical study of how such
+systems guarantee that a seat is never sold twice.**
 
 | | |
 |---|---|
-| Frontend | React 18 + Vite, React Router v6 (lazy routes), TanStack Query, Tailwind, React Hook Form + Zod |
-| Backend | Node 20, Express 4, TypeScript, Drizzle ORM, JWT + SQL-backed sessions |
-| Database | Neon Postgres 16 (embedded PGlite for zero-setup local dev and tests) |
-| Data | TMDB v3 (admin-triggered sync, cached in Postgres) |
-| Tests | Vitest + Supertest (42 tests incl. the concurrency test), Playwright E2E, k6 load scripts |
+| 🎬 **Live demonstration** | https://cinebook-eight-chi.vercel.app |
+| 📄 **Research report (PDF, 8 pp.)** | [`docs/research-report.pdf`](docs/research-report.pdf) |
+| 📚 **Literature review (PDF)** | [`docs/literature-review.pdf`](docs/literature-review.pdf) |
+| 🧭 **Technical documentation** | [methodology](docs/methodology.md) · [system architecture](docs/system-architecture.md) · [reproducibility](docs/reproducibility.md) · [tests](tests/README.md) |
+| 📈 **Experiment dashboard** | `npm run experiments:dashboard` → http://localhost:4600 ([screenshot](figures/fig8_live_dashboard.png)) |
+| 🗂️ **Dataset & data-generation scripts** | [`data/`](data/) ([data card](data/data-card.md)) · [`experiments/harness/`](experiments/harness/) |
+| 📓 **Analysis notebooks** | [`notebooks/`](notebooks/) (independent SciPy/Statsmodels re-analysis) |
+| 🔖 **Citation** | [`CITATION.cff`](CITATION.cff) · [BibTeX below](#citation) |
 
-## Quick start (no accounts needed)
+---
 
-```bash
-npm install
-npm start            # builds, then serves website + API together
-#   ➜ Open the app:  http://localhost:4000      ← click it
-```
+## 1. Project overview
 
-For development with hot reload use `npm run dev` instead and open **http://localhost:5173**
-(Vite serves the site there; the API runs on :4000, and its `/` redirects to :5173).
-Don't run both at once — they share the local database, and the second one refuses to
-start if the port is taken.
+CineBook is a full-stack movie-ticketing application:
+- **Booking flow:** browse real movies by city, pick a show, choose seats on a live seat map, pay through a simulated gateway, and receive a QR e-ticket.
+- **Stack:** a React single-page app and an Express API deployed together on Vercel, with Neon PostgreSQL.
 
-With no `DATABASE_URL`, the API runs on an embedded Postgres
-(PGlite, persisted in `apps/api/.data/`) and seeds itself on first boot: 3 cities,
-6 theatres, 12 screens, 7 days of showtimes and **real films in Indian cinemas** — two each in
-Hindi, English, Tamil, Telugu, Malayalam and Kannada, plus three coming soon — with TMDB
-posters, backdrops, cast and trailers. That list is a snapshot taken on 17 Oct 2026
-(`apps/api/src/db/catalog-snapshot.ts`); add a TMDB key (below) for a live sync.
+The project then treats its own core requirement, **"two users can never book the same seat,"** as a research
+question. It compares seven concurrency-control strategies under controlled, repeated experiments, and
+validates the deployed system end to end.
 
-If the local database ever gets corrupted (e.g. the API was force-killed mid-write),
-stop the dev server, delete `apps/api/.data/` and start again — it re-seeds itself.
+## 2. Problem statement
 
-- Admin: `admin@cinebook.dev` / `Admin@12345` → `/admin`
-- Test cards: `4242 4242 4242 4242` succeeds · `4000 0200 0000 0000` (ends 0000) is declined ·
-  `4111 1111 1111 1111` (ends 1111) times out — retrying is safe and returns the original result.
-- UPI ids starting with `fail` are declined.
+Ticket launches create extreme hot-spot contention. Ticketmaster reported 3.5 billion system requests in the
+2022 Eras Tour presale, and BookMyShow's site went down at the opening of the 2024 Coldplay India sale.
+Under such load, any gap between *checking* that a seat is free and *marking* it sold lets two buyers
+purchase the same seat (a *lost update*). Studies of real web applications show that such check-then-write
+logic is common and exploitable (Bailis *et al.*, SIGMOD 2015; Warszawski & Bailis, SIGMOD 2017).
 
-### Real movies from TMDB
+## 3. Research objectives
 
-Get a free key at https://www.themoviedb.org/settings/api, then:
+1. Measure whether each strategy prevents double booking under simultaneous demand (**RQ1**).
+2. Quantify the latency and throughput cost of each correct strategy (**RQ2**).
+3. Characterise deadlocks, aborts and seats sold under overlapping multi-seat requests (**RQ3**).
+4. Verify the deployed system's correctness and its PRD latency target, p95 < 200 ms (**RQ4**).
+5. Test whether the choice of test platform changes what can be observed (**RQ5**).
 
-```bash
-cp apps/api/.env.example apps/api/.env   # set TMDB_API_KEY=...
-npm run db:reset                         # wipe local data, re-seed with real now-playing movies (region IN)
-```
+## 4. Literature review
 
-Either the v3 API key or the v4 read-access token works. Admins can also re-sync from the dashboard.
+Full review: [`docs/literature-review.pdf`](docs/literature-review.pdf).
 
-### Use Neon instead of the embedded DB
+| Approach | Guarantee | Limitation |
+|---|---|---|
+| Check in application code, then write | none under concurrency | lost update → oversell |
+| Conditional write (`UPDATE … WHERE free`) | one winner per row | multi-row all-or-nothing needs care |
+| Pessimistic locking (`SELECT … FOR UPDATE`) | serialised access | deadlocks if lock order differs |
+| Optimistic validation (Kung & Robinson) | aborts on conflict | wasted work under contention |
+| SERIALIZABLE / SSI (Ports & Grittner) | serializable executions | aborts, including false positives |
+| Coarse or external locks | mutual exclusion | serialises unrelated work; timing assumptions |
 
-Set `DATABASE_URL` in `apps/api/.env` to Neon's **pooled** connection string (`-pooler`
-host), then `npm run db:seed`. The API uses a `pg` pool (max 10) and never opens a
-connection per request.
+**Gap.** Prior work explains *why* naive code fails and *what* each mechanism guarantees. It rarely gives a
+reproducible comparison for the seat-reservation pattern on a serverless + managed-database stack, where
+network round trips dominate cost. It also seldom asks whether the test platform hides the defect.
 
-## Scripts
+## 5. Proposed methodology
 
-| | |
+A **pre-registered design of experiments** ([`docs/methodology.md`](docs/methodology.md),
+[`experiments/configs/experiments.json`](experiments/configs/experiments.json)):
+
+| Item | Value |
 |---|---|
-| `npm start` | build, then run website + API as one server → http://localhost:4000 |
-| `npm run dev` | hot-reload dev: web (Vite) on http://localhost:5173, API on :4000 |
-| `npm test` | shared unit tests + API integration tests (in-memory PGlite) |
-| `npm run test:e2e` | Playwright happy path + declined card, desktop and mobile |
-| `npm run typecheck` / `npm run build` | all workspaces |
-| `npm run db:migrate` / `db:seed` / `db:reset` / `sync:tmdb` | database tasks (`-w @cinebook/api`) |
+| Hypotheses | H1: the baseline double-books · H2: database-enforced strategies never do · H3: costs differ; conditional UPDATE fastest · H4: deployed reads meet p95 < 200 ms · H5: an embedded test DB hides the race |
+| Independent variables | strategy (7 levels) · concurrent clients *c* = 1–32 · workload shape · platform |
+| Dependent variables | double bookings per trial, lost updates, aborts by cause, seats sold, latency p50/p95, throughput, server-side commits/rollbacks/deadlocks |
+| Control / baseline | naive read-check-write; identical schema for all strategies; fresh seats per trial; dedicated connection per client; barrier-synchronised start |
+| Repetitions | 15–20 trials per cell, plus a warm-up trial per cell (excluded); cells in seeded random order |
+| Analysis | medians and p95 with bootstrap CIs; Wilson CIs; rule of three; Fisher exact; Kruskal–Wallis → Mann–Whitney (Holm); Cliff's δ |
+| Validation | statistics self-test (12 reference values); independent SciPy/Statsmodels re-analysis (154/154 quantities agree) |
+| Ablations | lock ordering (sorted vs unordered locking); isolation level (READ COMMITTED vs SERIALIZABLE on identical code) |
+| Sensitivity | concurrency 2 → 32; platform (Neon vs embedded PGlite) |
 
-Set `TEST_DATABASE_URL` to a throwaway Neon branch to run the API suite — including the
-concurrency test — against real, truly concurrent Postgres. PGlite serialises every
-statement, so locally the test proves the logic, and on Neon it proves it under real
-row-lock contention.
+Strategies compared: `naive` (baseline) · `conditional_update` (CineBook) · `pessimistic_sorted` ·
+`pessimistic_unordered` · `optimistic_version` · `serializable` · `advisory_lock`.
 
-## Architecture
+## 6. System architecture
 
 ```mermaid
 flowchart LR
-  SPA["React SPA<br/>Vite + React Router<br/>(Vercel CDN)"] -- "REST + JWT<br/>/api/v1" --> API["Express API<br/>Zod validation · JWT<br/>hold transactions<br/>(Vercel Function)"]
-  API -- "SQL (pooled)" --> DB[("Neon Postgres<br/>show_seats = truth")]
-  API -. "admin sync only" .-> TMDB["TMDB API"]
+  U[Browser] -->|HTTPS| CDN[Vercel CDN · React SPA]
+  U -->|/api/v1 REST + JWT| FN[Vercel Function · Express API]
+  FN -->|SQL, pooled| DB[(Neon PostgreSQL 18)]
+  FN -. admin sync .-> TMDB[TMDB API]
 ```
 
-The API is stateless and can scale horizontally; seat conflicts are settled by a
-conditional `UPDATE` inside Postgres. TMDB is only touched by an admin sync, never on a
-user request.
+A seat hold is a single conditional `UPDATE` on `show_seats` (one row per seat per showtime). PostgreSQL waits
+on a concurrent writer's row lock and then re-checks the `WHERE` clause, so exactly one competitor wins.
+Payments are idempotent, using a unique `Idempotency-Key` and a partial unique index. Details, data model and
+the research-harness pipeline: [`docs/system-architecture.md`](docs/system-architecture.md).
 
-```
-apps/web          React SPA (pages, components, lib/api.ts auth-aware fetch)
-apps/api          Express API — routes/ services/ db/ middleware/ test/
-packages/shared   Zod schemas, pricing + gateway rules, API types (used by both sides)
-loadtest/         k6 scripts + results.md
-e2e/              Playwright specs
-```
+## 7. Experimental setup
 
-## Seat selection
+| | |
+|---|---|
+| Database | Neon PostgreSQL 18.6, AWS ap-southeast-1, pooled connections; isolated `research` schema |
+| Deployed system | Vercel function (region sin1) + Neon, accessed over HTTPS through Vercel's CDN |
+| Client | Intel i5-12400F (12 threads), 15.9 GB RAM, Windows 10, Node.js 24.19; median RTT to DB 102 ms |
+| Experiments | E1 hot seat (*c* = 2, 8, 32 × 20 trials) · E2 overlapping 3-of-10 seats (*c* = 16 × 15) · E3 no collisions (*c* = 1, 16 × 6 × 5 holds) · E4 live site (latency 3 × 40 × 4 endpoints; 12 sixteen-user races; 6 payment double-submits) · E5 PGlite (*c* = 8 × 15) |
+| Volume | 13 228 logged events, 12 402 transactions, 687 trials, collected 25 Oct 2026 |
+| Seed | `20261025` |
 
-Like BookMyShow, the seat map opens with **"How many seats?"** — a vehicle illustrates the
-party size (1 cycle · 2 scooter · 3 auto · 4 car · 5–6 SUV · 7–8 van · 9–10 bus) next to each
-tier's price and availability. Tapping a seat then selects that many adjacent free seats in
-the row (rightwards first, then leftwards), never jumping an aisle, gap or taken seat; tap
-more seats to fill any remainder. *Proceed* unlocks only when the chosen number of seats is
-selected, and the "N Tickets ✎" chip reopens the picker.
+## 8. Results
 
-## How seat locking works
+| Strategy | Double bookings (E1+E2) | E2 deadlocks | E2 aborts | E3 median latency, c = 16 | E3 throughput, c = 16 |
+|---|---|---|---|---|---|
+| naive (baseline) | **1 351** (60/60 E1 trials fail) | 0 | 0% | 435 ms | 31.8 /s |
+| **conditional_update** | **0** | 0 | 0% | **344 ms** | **38.3 /s** |
+| pessimistic_sorted | 0 | 0 | 0% | 445 ms | 31.1 /s |
+| pessimistic_unordered | 0 | **93 (38.8%)** | 38.8% | — | — |
+| optimistic_version | 0 | 0 | 0% | 441 ms | 30.5 /s |
+| serializable | 0 | 0 | **93.8%** | 439 ms | 29.8 /s |
+| advisory_lock | 0 | — | — | 5 614 ms | 2.8 /s |
 
-`show_seats` has one row per seat per showtime with primary key `(showtime_id, seat_id)`.
-A hold is a single conditional update in one transaction:
+<p align="center">
+<img src="figures/fig1_double_bookings.png" width="48%" alt="Double bookings per trial vs concurrency">
+<img src="figures/fig3_multi_seat_outcomes.png" width="48%" alt="Outcome of every request in E2">
+</p>
+<p align="center"><em>Left: double bookings per trial vs concurrent clients (E1), where the baseline grows as c − 1 and all others stay at 0. Right: outcome of every request with overlapping three-seat requests (E2).</em></p>
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant A as User A
-  participant B as User B
-  participant API
-  participant PG as Postgres
-  A->>API: POST /showtimes/:id/holds {seatIds:[E7]}
-  B->>API: POST /showtimes/:id/holds {seatIds:[E7]}
-  API->>PG: BEGIN; UPDATE show_seats SET status='HELD'… WHERE seat=E7 AND (AVAILABLE OR hold expired) RETURNING
-  API->>PG: BEGIN; same UPDATE (blocks on A's row lock)
-  PG-->>API: A: 1 row → INSERT booking PENDING; COMMIT
-  API-->>A: 201 {bookingId, holdExpiresAt, pricing}
-  PG-->>API: B: row re-checked after A commits → status is HELD → 0 rows
-  API->>PG: ROLLBACK
-  API-->>B: 409 SEATS_UNAVAILABLE {seatIds:[E7]}
-```
+<p align="center">
+<img src="figures/fig5_throughput.png" width="48%" alt="Throughput with bootstrap CIs">
+<img src="figures/fig6_live_latency_cdf.png" width="48%" alt="Live latency CDF">
+</p>
+<p align="center"><em>Left: throughput with 95% bootstrap CIs (E3). Right: live end-to-end latency distribution, with a dashed line at the 200 ms target (E4).</em></p>
 
-```sql
-UPDATE show_seats
-   SET status = 'HELD', held_by = $user, hold_id = $booking,
-       hold_expires_at = now() + interval '10 minutes', version = version + 1
- WHERE showtime_id = $show
-   AND seat_id = ANY($seatIds)
-   AND (status = 'AVAILABLE' OR (status = 'HELD' AND hold_expires_at < now()))
-RETURNING seat_id;
--- returned rows != requested → ROLLBACK, 409 with the missing ids (all-or-nothing)
-```
+**Live system (E4).**
+- **Seat races:** 12/12 sixteen-user races for one seat had exactly one winner (192 requests, no errors).
+- **Payments:** 6/6 parallel payment double-submits created one payment record, with 0 double charges, and every retry was recognised as a replay.
+- **Latency:** read p95 was health 150 ms, movies 60 ms, showtimes 146 ms and seat map 200 ms [95% CI 144–417].
 
-- **Expired holds are reclaimable inline** (the `OR` clause), so correctness never depends
-  on a background job. A sweeper (every 60 s) only tidies data: stale holds → `AVAILABLE`,
-  their bookings → `EXPIRED`.
-- **One active hold per user per showtime**: a new hold releases the previous one in the
-  same transaction.
-- **Deadlocks** between holds that lock overlapping seats in different orders are aborted
-  by Postgres and surfaced as `409`, which is what they are.
-- **Showtimes can't overlap** on a screen: an `EXCLUDE USING gist` constraint on
-  `tstzrange(starts_at, ends_at)`.
+**Platform (E5).** The same baseline code double-booked in 20/20 trials on Neon and in 0/15 on embedded PGlite.
 
-### Payment (fake gateway)
+All figures: [`figures/`](figures/) · all tables: [`data/processed/`](data/processed/).
 
-`POST /bookings/:id/pay` needs an `Idempotency-Key` header (unique column on
-`payments`). Same key → the original result is replayed; a double-click can never
-double-charge. A partial unique index allows at most one in-flight/successful payment per
-booking even across different keys. On success, a single transaction flips `HELD → BOOKED`
-**only** where `hold_id` matches and the hold hasn't expired; if it has, the payment is
-marked `REFUNDED` and the API returns `410 HOLD_EXPIRED`. Only the last 4 card digits are
-stored, and the CVV never leaves the browser.
+## 9. Statistical analysis
 
-Booking states: `PENDING → CONFIRMED` (paid) · `PENDING → FAILED` (declined; seats released)
-· `PENDING → EXPIRED` (timer) · `CONFIRMED → CANCELLED` (≥ 2 h before the show; fake refund).
-
-### Auth
-
-- Access token: JWT HS256, 15 min, `{sub, role, sid}`, kept **in memory** only.
-- Refresh token: 32 random bytes in an `httpOnly; SameSite=Lax` cookie scoped to
-  `/api/v1/auth`; only its SHA-256 hash is stored in `sessions`.
-- Every refresh rotates the token within a `family_id`. Presenting an already-rotated
-  token is treated as theft and revokes **all** of the user's sessions (a 10 s grace
-  window covers two tabs refreshing at once).
-- Middleware checks only the JWT signature on reads (no DB hit); pay and cancel also
-  verify the session row is live, so "sign out everywhere" takes effect immediately.
-- bcrypt cost 12 (`bcryptjs`, the pure-JS implementation of the same algorithm, so there's
-  no native build on Windows/CI), Helmet, a CORS allow-list, and login rate-limited to
-  5 failures / 15 min per IP + email.
-
-## API
-
-REST under `/api/v1`, JSON only, every body and query validated with Zod. Errors always use
-`{ "error": { "code", "message", "details" } }`.
-
-| Method | Path | Auth | |
+| Hypothesis | Test | Result | Verdict |
 |---|---|---|---|
-| POST | `/auth/signup`, `/auth/login` | — | returns `{user, accessToken}` + refresh cookie |
-| POST | `/auth/refresh` | cookie | rotate |
-| POST | `/auth/logout`, `/auth/logout-all` | U | |
-| GET/PATCH | `/me` | U | profile |
-| GET | `/cities` | — | |
-| GET | `/movies?status&city&lang&genre&format&q` | — | city ⇒ only movies with shows there |
-| GET | `/movies/:id` | — | detail + top-10 cast |
-| GET | `/movies/:id/showtimes?city&date` | — | next 7 days, grouped by theatre |
-| GET | `/showtimes/:id/seats` | — (optional U) | layout + per-seat state + tier prices |
-| POST | `/showtimes/:id/holds` | U | `{seatIds}` → `201` or `409` |
-| DELETE | `/holds/:bookingId` | U | release early |
-| POST | `/bookings/:id/pay` | U + session | `Idempotency-Key` header |
-| GET | `/bookings?scope=upcoming\|past`, `/bookings/:id` | U | ticket includes QR data URL |
-| POST | `/bookings/:id/cancel` | U + session | |
-| * | `/admin/...` | A | stats, TMDB sync, theatres, screens, showtimes, auto-schedule, bookings |
-| GET | `/health` | — | DB ping (load-test warm-up) |
+| H1 baseline double-books | Wilson CI; Fisher exact vs conditional UPDATE | 60/60 trials, 95% CI 94–100%; *p* = 2.1×10⁻³⁵ | supported |
+| H2 others never do | rule of three / exact bound | 0 in 75 trials (1 080 transactions) each; per-trial upper bound 4% | supported |
+| H3 costs differ | Kruskal–Wallis; Mann–Whitney + Holm; Cliff's δ | *H* = 1936 (*c* = 16); every pair *p* ≤ 4.4×10⁻⁷; δ = 0.96–1.00 at *c* = 16 (large) | supported |
+| H4 live p95 < 200 ms | bootstrap CI of p95 | 3 of 4 endpoints have their whole CI below 200 ms; seat map CI reaches 417 ms | partially |
+| H5 platform hides race | Fisher exact | 20/20 vs 0/15; *p* = 3.1×10⁻¹⁰ | supported |
 
-Status codes: `401` expired token (client refreshes once), `409 SEATS_UNAVAILABLE`,
-`410 HOLD_EXPIRED`, `422` validation, `429` rate limit.
+Variability is reported throughout as confidence intervals rather than single numbers. Every quantity above
+was recomputed independently in Python ([`notebooks/04_statistical_analysis.ipynb`](notebooks/04_statistical_analysis.ipynb)),
+and all 154 checks agree.
 
-**Pricing:** tiers per screen (e.g. Recliner ₹450, Prime ₹250, Classic ₹180), optional
-per-showtime overrides; ₹30/ticket convenience fee + 18% GST on the fee. Money is integer
-paise throughout.
+## 10. Reproducibility
 
-## Deploy: Vercel + Neon
+```bash
+npm ci
+npm run stats:selftest && npm run experiments:analyze
+git diff --exit-code -- data/processed experiments/results    # identical results from the committed raw data
+```
 
-One Vercel project serves everything on one domain: the React site from Vercel's CDN and
-the Express API as a single Vercel Function at `/api/*` (same origin, so the
-`SameSite=Lax` refresh cookie just works). `scripts/build-vercel.mjs` produces this with
-Vercel's [Build Output API](https://vercel.com/docs/build-output-api); `vercel.json` points
-Vercel at it.
+- **Re-running the experiments:** [`docs/reproducibility.md`](docs/reproducibility.md) covers re-running against your own database, the live dashboard and the Python notebooks.
+- **What is recorded:** run manifests record the git commit, software versions, hardware, database host, network samples and the randomised execution order.
+- **Continuous check:** the CI job `research` verifies on every push that the analysis reproduces the committed results byte for byte and that the independent re-analysis agrees.
 
-1. **Neon**: create a project (region **AWS Asia Pacific – Singapore**, next to the
-   function's `sin1` region) and copy the **pooled** connection string (`-pooler` host).
-2. **Load the data** once, from your machine:
-   ```bash
-   # apps/api/.env  →  DATABASE_URL=postgresql://…-pooler…/neondb?sslmode=require
-   npm run db:seed      # schema + cities, theatres, screens, movies, cast, showtimes, admin
-   ```
-   Movies, posters (TMDB image CDN links), cast and trailers all come from the seed, so a
-   fresh database looks exactly like local dev.
-3. **Vercel**: *Add New → Project → import the GitHub repo* (keep Root Directory `./`;
-   the framework preset and build settings come from `vercel.json`). Add environment variables:
+## 11. Limitations
 
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | the Neon pooled connection string |
-   | `JWT_ACCESS_SECRET` | 48+ random characters (`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`) |
-   | `NODE_ENV` | `production` |
-   | `TMDB_API_KEY` | optional — enables the admin "Sync from TMDB" button |
+- **Single client location.** All load came from one client in India; absolute latencies include a ~100 ms wide-area round trip.
+- **One database configuration.** One Neon compute size, with connections through a pooler.
+- **No retries.** The strategies were measured without automatic retries; with retries, SERIALIZABLE and optimistic control would sell more seats at higher latency.
+- **Limited concurrency.** Concurrency was capped at 32 clients; real flash sales are far larger and normally shaped by a virtual queue.
+- **Small live samples.** 12 races and 6 payment trials confirm rather than establish correctness.
+- **Seat-map latency.** The seat-map endpoint has not been shown to meet the p95 < 200 ms target.
 
-4. Deploy, open the URL, sign in as the seeded admin, and **change the admin password**
-   (or set `ADMIN_EMAIL` / `ADMIN_PASSWORD` before seeding).
+## 12. Future work
 
-Notes: the 60 s expiry sweeper has no long-running process on Vercel; the function tidies
-expired holds opportunistically, and correctness never depended on it (expired holds are
-reclaimed inline). Neon's free compute sleeps when idle, so the first request after a
-pause takes a second or two longer.
-
-Prefer a single always-on server? `render.yaml` deploys the same app to Render instead
-(`npm start` runs that mode locally).
-
-
-## Scope
-
-P0 is complete. Shipped P1: login rate limit, title search, cancellation, and the admin
-bookings list and revenue. Not built (P1/P2): WebSocket/SSE seat push (the map polls
-every 5 s), Google OAuth, scheduled TMDB cron, email tickets.
+- Repeat the study from several regions and at larger concurrency, behind a virtual queue.
+- Add retry policies and measure *goodput* (seats sold per second).
+- Evaluate `SKIP LOCKED`-based "best available" seat suggestion.
+- Profile and cache the seat-map query to bring its p95 under 200 ms.
+- Push seat-map updates over Server-Sent Events instead of polling.
 
 ---
-This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+## Repository structure
+
+```
+docs/                  research-report.pdf · literature-review.pdf · methodology.md
+                       system-architecture.md · reproducibility.md · report-source/
+data/                  raw/ (transaction logs) · processed/ (CSV tables) · data-card.md
+notebooks/             01_exploratory_analysis · 02_baseline_experiments
+                       03_strategy_comparison · 04_statistical_analysis
+experiments/           configs/ · harness/ (runners, strategies, statistics, analysis, charts)
+                       dashboard/ · results/ · logs/ (run manifests) · load-tests/ (k6)
+figures/               every figure in the report
+tests/                 e2e/ (Playwright) · README.md (index of all test suites)
+apps/web/              React SPA                    ┐
+apps/api/              Express API (+ test/)        ├ application source (npm workspaces)
+packages/shared/       shared Zod schemas & rules   ┘
+scripts/               build-vercel.mjs (deployment build) · start.mjs
+```
+
+## Running the application
+
+```bash
+npm install
+npm start              # builds, then serves site + API → http://localhost:4000
+npm run dev            # hot-reload development → http://localhost:5173
+npm test               # unit + API integration tests (incl. 50 concurrent holds → 1 winner)
+npm run test:e2e       # Playwright end-to-end tests
+```
+
+With no `DATABASE_URL`, the API runs on an embedded PostgreSQL and seeds itself with real current films
+(two per Indian language plus English), theatres in three cities and seven days of showtimes. For a persistent
+database set `DATABASE_URL` in `apps/api/.env` to a Neon connection string and run `npm run db:seed`.
+Test card `4242 4242 4242 4242` succeeds, a card ending `0000` is declined, and one ending `1111` simulates a bank timeout.
+
+## Citation
+
+```bibtex
+@software{chitakana2026cinebook,
+  author  = {Chitakana, Kishan Phani},
+  title   = {CineBook: An Empirical Comparison of Concurrency-Control Strategies for
+             Seat Reservation in a Serverless Ticket-Booking System},
+  year    = {2026},
+  url     = {https://github.com/Icoder05/cinebook},
+  note    = {Live demo: https://cinebook-eight-chi.vercel.app}
+}
+```
+
+## License
+
+MIT; see [`LICENSE`](LICENSE). Movie data and images come from TMDB. This product uses the TMDB API but is not endorsed or
+certified by TMDB.

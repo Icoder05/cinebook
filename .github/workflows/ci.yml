@@ -43,3 +43,26 @@ jobs:
         with:
           name: playwright-report
           path: test-results
+
+  # Research reproducibility: the committed raw logs must reproduce the committed
+  # results exactly, and an independent SciPy/Statsmodels re-analysis must agree.
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run stats:selftest
+      - run: npm run experiments:analyze
+      - name: Analysis reproduces the committed results byte-for-byte
+        run: git diff --exit-code -- data/processed experiments/results
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Independent cross-validation (notebook 04 asserts agreement)
+        run: jupyter nbconvert --to notebook --execute --stdout notebooks/04_statistical_analysis.ipynb > /dev/null

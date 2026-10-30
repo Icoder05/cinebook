@@ -2,7 +2,7 @@
   "name": "cinebook",
   "private": true,
   "version": "0.1.0",
-  "description": "CineBook — a portfolio-grade BookMyShow clone",
+  "description": "CineBook — a BookMyShow-style booking system and an empirical study of concurrency control for seat reservation",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -17,7 +17,15 @@
     "db:seed": "npm run db:seed -w @cinebook/api",
     "db:reset": "npm run db:reset -w @cinebook/api",
     "test:e2e": "playwright test",
-    "start:only": "node scripts/start.mjs"
+    "start:only": "node scripts/start.mjs",
+    "stats:selftest": "node experiments/harness/stats.mjs",
+    "experiments:run": "node experiments/harness/runner.mjs --exp E1,E2,E3 --run main-neon",
+    "experiments:platform": "node experiments/harness/runner.mjs --exp E5 --run main-pglite",
+    "experiments:live": "node experiments/harness/live.mjs --run main-live",
+    "experiments:analyze": "node experiments/harness/analyze.mjs --neon main-neon --pglite main-pglite --live main-live",
+    "experiments:figures": "node experiments/harness/charts.mjs",
+    "experiments:dashboard": "node experiments/dashboard/server.mjs",
+    "report:build": "node experiments/harness/build-report.mjs && node experiments/harness/build-report.mjs --doc literature-review"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

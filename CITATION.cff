@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, data or analysis, please cite it as below."
+title: "CineBook: An Empirical Comparison of Concurrency-Control Strategies for Seat Reservation in a Serverless Ticket-Booking System"
+type: software
+authors:
+  - family-names: Chitakana
+    given-names: Kishan Phani
+repository-code: "https://github.com/Icoder05/cinebook"
+url: "https://cinebook-eight-chi.vercel.app"
+license: MIT
+date-released: 2026-10-25
+keywords:
+  - concurrency control
+  - transaction isolation
+  - double booking
+  - PostgreSQL
+  - serializable snapshot isolation
+  - serverless
+  - design of experiments
