@@ -21,12 +21,18 @@ function Seat({
   tierName,
   price,
   onToggle,
+  rowIndex,
+  tabStop,
+  onFocus,
 }: {
   seat: SeatMapSeat;
   selected: boolean;
   tierName: string;
   price: number;
   onToggle: () => void;
+  rowIndex: number;
+  tabStop: boolean;
+  onFocus: () => void;
 }) {
   if (seat.state === 'BLOCKED') return <span className="h-8 w-8" aria-hidden />;
   const taken = !selectable(seat);
@@ -35,7 +41,12 @@ function Seat({
     <button
       type="button"
       onClick={onToggle}
+      onFocus={onFocus}
       disabled={taken}
+      tabIndex={tabStop ? 0 : -1}
+      data-seat
+      data-r={rowIndex}
+      data-c={seat.col}
       aria-pressed={selected}
       aria-label={`Row ${seat.row} seat ${seat.col}, ${tierName} ${formatINR(price)}, ${stateText}`}
       title={`${seat.row}${seat.col} · ${tierName} · ${formatINR(price)}`}
@@ -93,6 +104,40 @@ function useRows(data: SeatMapResponse | undefined) {
   }, [data]);
 }
 
+/**
+ * Roving tabindex for the seat grid (WAI-ARIA APG grid pattern): the whole map is one Tab
+ * stop and arrow keys move between selectable seats, so keyboard users don't have to Tab
+ * through every seat to reach the Pay button.
+ */
+function moveInGrid(e: React.KeyboardEvent<HTMLDivElement>) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+  const seats = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-seat]:not(:disabled)')];
+  const i = seats.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0) return;
+  const r = Number(seats[i].dataset.r);
+  const c = Number(seats[i].dataset.c);
+  const inRow = (row: number) => seats.filter((b) => Number(b.dataset.r) === row);
+  let next: HTMLButtonElement | undefined;
+  if (e.key === 'ArrowRight') next = seats[i + 1];
+  else if (e.key === 'ArrowLeft') next = seats[i - 1];
+  else if (e.key === 'Home') next = inRow(r)[0];
+  else if (e.key === 'End') next = inRow(r).at(-1);
+  else {
+    const rows = [...new Set(seats.map((b) => Number(b.dataset.r)))];
+    const target = rows[rows.indexOf(r) + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (target !== undefined) {
+      next = inRow(target).reduce<HTMLButtonElement | undefined>(
+        (best, b) => (!best || Math.abs(Number(b.dataset.c) - c) < Math.abs(Number(best.dataset.c) - c) ? b : best),
+        undefined,
+      );
+    }
+  }
+  if (next) {
+    e.preventDefault();
+    next.focus();
+  }
+}
+
 export default function SeatMap() {
   const { id } = useParams();
   const showtimeId = id!;
@@ -146,6 +191,12 @@ export default function SeatMap() {
   const tierById = useMemo(() => new Map(data?.tiers.map((t) => [t.id, t]) ?? []), [data]);
   const seatById = useMemo(() => new Map(data?.seats.map((s) => [s.id, s]) ?? []), [data]);
   const groups = useRows(data);
+  const [focusedSeat, setFocusedSeat] = useState<string | null>(null);
+  const tabStop = useMemo(() => {
+    const ok = (sid: string | null) => !!sid && !!seatById.get(sid) && selectable(seatById.get(sid)!);
+    if (ok(focusedSeat)) return focusedSeat;
+    return selected.find(ok) ?? data?.seats.find((s) => selectable(s))?.id ?? null;
+  }, [focusedSeat, selected, seatById, data]);
   const tierAvailability = useMemo<TierAvailability[]>(
     () =>
       data?.tiers.map((t) => {
@@ -290,14 +341,23 @@ export default function SeatMap() {
 
       <div className="container-page mt-4">
         <div className="card overflow-x-auto px-4 py-6">
-          <div className="mx-auto w-max space-y-6" role="group" aria-label="Seat map">
-            {groups.map(({ tier, rows }) => (
+          <p id="seat-map-help" className="sr-only">
+            Use the arrow keys to move between seats and Enter or Space to choose a seat.
+          </p>
+          <div
+            className="mx-auto w-max space-y-6"
+            role="group"
+            aria-label="Seat map"
+            aria-describedby="seat-map-help"
+            onKeyDown={moveInGrid}
+          >
+            {groups.map(({ tier, rows }, groupIndex) => (
               <section key={tier.id} aria-label={`${tier.name} ${formatINR(tier.pricePaise)}`}>
                 <h2 className="mb-2 border-b pb-1 text-xs uppercase tracking-wide text-ink-muted">
                   {formatINR(tier.pricePaise)} {tier.name}
                 </h2>
                 <div className="space-y-1.5">
-                  {rows.map(([row, seats]) => {
+                  {rows.map(([row, seats], rowIndex) => {
                     const byCol = new Map(seats.map((s) => [s.col, s]));
                     return (
                       <div key={row} className="flex items-center gap-1.5">
@@ -315,6 +375,9 @@ export default function SeatMap() {
                                   tierName={tier.name}
                                   price={tier.pricePaise}
                                   onToggle={() => toggle(s.id)}
+                                  rowIndex={groupIndex * 100 + rowIndex}
+                                  tabStop={s.id === tabStop}
+                                  onFocus={() => setFocusedSeat(s.id)}
                                 />
                               ) : (
                                 <span className="h-8 w-8 shrink-0" aria-hidden />
