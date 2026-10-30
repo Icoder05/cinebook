@@ -26,6 +26,7 @@ import {
 } from '../db/schema.js';
 import { env } from '../env.js';
 import { AppError, conflict, forbidden, notFound, PG, pgCode } from '../lib/errors.js';
+import { ticketPayload, verifyTicketPayload } from '../lib/ticket.js';
 import { sleep } from '../lib/time.js';
 
 /** Columns that return a show_seat to the pool. */
@@ -521,7 +522,7 @@ export async function getBooking(
   const iso = (v: string | Date | null) => (v ? new Date(v).toISOString() : null);
   const qrDataUrl =
     r.status === 'CONFIRMED'
-      ? await QRCode.toDataURL(`CINEBOOK:${r.code}:${r.id}`, { margin: 1, width: 240 })
+      ? await QRCode.toDataURL(ticketPayload(r.id, r.code), { margin: 1, width: 240 })
       : null;
 
   return {
@@ -649,4 +650,45 @@ export async function cancelBooking(userId: string, bookingId: string) {
       .set({ status: 'REFUNDED', updatedAt: sql`now()` })
       .where(and(eq(payments.bookingId, b.id), eq(payments.status, 'SUCCESS')));
   });
+}
+
+// ---------------------------------------------------------------------------
+// Ticket validation at the venue (signed QR + one-time check-in).
+// ---------------------------------------------------------------------------
+
+export type TicketVerdict =
+  | 'VALID'
+  | 'MALFORMED'
+  | 'BAD_SIGNATURE'
+  | 'NOT_FOUND'
+  | 'NOT_CONFIRMED'
+  | 'ALREADY_CHECKED_IN';
+
+export async function verifyTicket(payload: string, checkIn = true) {
+  const parsed = verifyTicketPayload(payload);
+  if (!parsed.ok) return { valid: false, verdict: parsed.reason as TicketVerdict };
+
+  const [b] = await db()
+    .select({ id: bookings.id, code: bookings.code, status: bookings.status, seatCount: bookings.seatCount, checkedInAt: bookings.checkedInAt })
+    .from(bookings)
+    .where(eq(bookings.id, parsed.bookingId))
+    .limit(1);
+  if (!b || b.code !== parsed.code) return { valid: false, verdict: 'NOT_FOUND' as TicketVerdict };
+  if (b.status !== 'CONFIRMED') return { valid: false, verdict: 'NOT_CONFIRMED' as TicketVerdict, status: b.status };
+  if (!checkIn) {
+    return b.checkedInAt
+      ? { valid: false, verdict: 'ALREADY_CHECKED_IN' as TicketVerdict, checkedInAt: b.checkedInAt.toISOString() }
+      : { valid: true, verdict: 'VALID' as TicketVerdict, code: b.code, seatCount: b.seatCount };
+  }
+  // One conditional UPDATE: two gates scanning the same ticket cannot both admit it.
+  const [admitted] = await db()
+    .update(bookings)
+    .set({ checkedInAt: sql`now()` })
+    .where(and(eq(bookings.id, b.id), eq(bookings.status, 'CONFIRMED'), sql`${bookings.checkedInAt} IS NULL`))
+    .returning({ checkedInAt: bookings.checkedInAt });
+  if (!admitted) {
+    const [again] = await db().select({ checkedInAt: bookings.checkedInAt }).from(bookings).where(eq(bookings.id, b.id));
+    return { valid: false, verdict: 'ALREADY_CHECKED_IN' as TicketVerdict, checkedInAt: again?.checkedInAt?.toISOString() ?? null };
+  }
+  return { valid: true, verdict: 'VALID' as TicketVerdict, code: b.code, seatCount: b.seatCount, checkedInAt: admitted.checkedInAt!.toISOString() };
 }

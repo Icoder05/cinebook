@@ -285,3 +285,55 @@ describe('expiry sweeper', () => {
     expect(await seatStatus(f.showtimeId, f.seatIds[0])).toBe('AVAILABLE');
   });
 });
+
+describe('ticket validation (signed QR + one-time check-in)', () => {
+  async function adminToken() {
+    const { ensureAdmin } = await import('../src/services/auth.service.js');
+    await ensureAdmin('gate.staff@example.com', 'staffpass123');
+    const r = await request(app).post('/api/v1/auth/login').send({ email: 'gate.staff@example.com', password: 'staffpass123' }).expect(200);
+    return { Authorization: `Bearer ${r.body.accessToken}` };
+  }
+  async function confirmedTicket() {
+    const f = await createFixture(24);
+    const u = await signup(app);
+    const h = await hold(u, f.showtimeId, [f.seatIds[0]]).expect(201);
+    await pay(u, h.body.bookingId, CARD_OK).expect(200);
+    const { ticketPayload } = await import('../src/lib/ticket.js');
+    const b = (await request(app).get(`/api/v1/bookings/${h.body.bookingId}`).set(auth(u))).body.booking;
+    return { u, bookingId: b.id as string, payload: ticketPayload(b.id, b.code) };
+  }
+  const verify = (headers: object, payload: string, checkIn = true) =>
+    request(app).post('/api/v1/admin/tickets/verify').set(headers).send({ payload, checkIn });
+
+  it('admits a genuine ticket exactly once', async () => {
+    const staff = await adminToken();
+    const { payload } = await confirmedTicket();
+    expect((await verify(staff, payload).expect(200)).body).toMatchObject({ valid: true, verdict: 'VALID' });
+    expect((await verify(staff, payload).expect(200)).body).toMatchObject({ valid: false, verdict: 'ALREADY_CHECKED_IN' });
+  });
+
+  it('rejects forged, tampered and malformed tickets', async () => {
+    const staff = await adminToken();
+    const { payload } = await confirmedTicket();
+    const [p, id, code, sig] = payload.split('.');
+    const flipped = sig[0] === 'A' ? 'B' + sig.slice(1) : 'A' + sig.slice(1);
+    expect((await verify(staff, `${p}.${id}.${code}.${flipped}`)).body.verdict).toBe('BAD_SIGNATURE');
+    expect((await verify(staff, `${p}.${id}.CBZZZZZZ.${sig}`)).body.verdict).toBe('BAD_SIGNATURE');
+    expect((await verify(staff, `CINEBOOK:${code}:${id}`)).body.verdict).toBe('MALFORMED');
+  });
+
+  it('rejects a cancelled booking and refuses non-staff callers', async () => {
+    const staff = await adminToken();
+    const { u, bookingId, payload } = await confirmedTicket();
+    await request(app).post(`/api/v1/bookings/${bookingId}/cancel`).set(auth(u)).expect(200);
+    expect((await verify(staff, payload, false)).body.verdict).toBe('NOT_CONFIRMED');
+    await verify(auth(u), payload).expect(403);
+  });
+
+  it('admits once even when two gates scan simultaneously', async () => {
+    const staff = await adminToken();
+    const { payload } = await confirmedTicket();
+    const results = await Promise.all(Array.from({ length: 10 }, () => verify(staff, payload)));
+    expect(results.filter((r) => r.body.verdict === 'VALID')).toHaveLength(1);
+  });
+});

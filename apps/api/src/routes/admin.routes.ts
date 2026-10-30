@@ -8,6 +8,7 @@ import {
   showtimeSchema,
   theatreSchema,
   theatreUpdateSchema,
+  ticketVerifySchema,
   uuid,
 } from '@cinebook/shared';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ import { db } from '../db/client.js';
 import { ah, parse } from '../lib/http.js';
 import { requireAdmin } from '../middleware/auth.js';
 import * as admin from '../services/admin.service.js';
+import { verifyTicket } from '../services/booking.service.js';
 import { syncMoviesFromTmdb } from '../services/tmdb.service.js';
 import { autoSchedule, createScreen, createShowtime } from '../services/venue.service.js';
 
@@ -120,5 +122,14 @@ adminRouter.get(
   '/bookings',
   ah(async (req, res) => {
     res.json(await admin.listAllBookings(parse(adminBookingsQuerySchema, req.query)));
+  }),
+);
+
+// Venue staff: scan a QR ticket → verify signature, status, and check in once.
+adminRouter.post(
+  '/tickets/verify',
+  ah(async (req, res) => {
+    const { payload, checkIn } = parse(ticketVerifySchema, req.body);
+    res.json(await verifyTicket(payload, checkIn));
   }),
 );

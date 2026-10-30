@@ -167,6 +167,7 @@ export const bookings = pgTable('bookings', {
   createdAt: ts('created_at').notNull().defaultNow(),
   confirmedAt: ts('confirmed_at'),
   cancelledAt: ts('cancelled_at'),
+  checkedInAt: ts('checked_in_at'),
 });
 
 export const showSeats = pgTable(

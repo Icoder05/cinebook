@@ -77,3 +77,8 @@ export const adminBookingsQuerySchema = z.object({
 export const autoScheduleSchema = z.object({
   days: z.coerce.number().int().min(1).max(14).default(7),
 });
+
+export const ticketVerifySchema = z.object({
+  payload: z.string().trim().min(1).max(200),
+  checkIn: z.boolean().default(true),
+});

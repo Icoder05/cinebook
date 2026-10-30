@@ -1,8 +1,12 @@
 import { sql } from 'drizzle-orm';
 import { db, execRaw } from './client.js';
 import init from './migrations/0001_init.js';
+import ticketCheckin from './migrations/0002_ticket_checkin.js';
 
-const migrations: { name: string; sql: string }[] = [{ name: '0001_init', sql: init }];
+const migrations: { name: string; sql: string }[] = [
+  { name: '0001_init', sql: init },
+  { name: '0002_ticket_checkin', sql: ticketCheckin },
+];
 
 export async function migrate(log = console.log) {
   await execRaw(`CREATE TABLE IF NOT EXISTS _migrations (
