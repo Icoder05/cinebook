@@ -6,8 +6,8 @@ systems guarantee that a seat is never sold twice.**
 | | |
 |---|---|
 | 🎬 **Live demonstration** | https://cinebook-eight-chi.vercel.app |
-| 📄 **Research report (PDF, 8 pp.)** | [`docs/research-report.pdf`](docs/research-report.pdf) |
-| 📚 **Literature review (PDF)** | [`docs/literature-review.pdf`](docs/literature-review.pdf) |
+| 📄 **Research report (8 pp.)** | [PDF](docs/research-report.pdf) · [Word](docs/research-report.docx) |
+| 📚 **Literature review** | [PDF](docs/literature-review.pdf) · [Word](docs/literature-review.docx) |
 | 🧭 **Technical documentation** | [methodology](docs/methodology.md) · [system architecture](docs/system-architecture.md) · [reproducibility](docs/reproducibility.md) · [tests](tests/README.md) |
 | 📈 **Experiment dashboard** | `npm run experiments:dashboard` → http://localhost:4600 ([screenshot](figures/fig8_live_dashboard.png)) |
 | 🗂️ **Dataset & data-generation scripts** | [`data/`](data/) ([data card](data/data-card.md)) · [`experiments/harness/`](experiments/harness/) |
@@ -186,7 +186,7 @@ git diff --exit-code -- data/processed experiments/results    # identical result
 ## Repository structure
 
 ```
-docs/                  research-report.pdf · literature-review.pdf · methodology.md
+docs/                  research-report (.pdf/.docx) · literature-review (.pdf/.docx) · methodology.md
                        system-architecture.md · reproducibility.md · report-source/
 data/                  raw/ (transaction logs) · processed/ (CSV tables) · data-card.md
 notebooks/             01_exploratory_analysis · 02_baseline_experiments

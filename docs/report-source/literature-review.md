@@ -1,8 +1,5 @@
 <div class="title-block">
 <h1>Literature Review: Concurrency Control for Seat Reservation in Web-Scale Booking Systems</h1>
-<div class="authors">
-<div class="author"><span class="name">[Author Name]</span><br>[Department of Computer Science and Engineering]<br>[Institution Name], [City], India</div>
-</div>
 </div>
 
 <div class="columns">

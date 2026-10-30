@@ -1,8 +1,5 @@
 <div class="title-block">
 <h1>Preventing Double Bookings under Concurrent Demand: An Empirical Comparison of Concurrency-Control Strategies in a Serverless Ticket-Booking System</h1>
-<div class="authors">
-<div class="author"><span class="name">[Author Name]</span><br>[Department of Computer Science and Engineering]<br>[Institution Name], [City], India<br>[email address]</div>
-</div>
 </div>
 
 <div class="columns">

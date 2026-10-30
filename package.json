@@ -25,11 +25,12 @@
     "experiments:analyze": "node experiments/harness/analyze.mjs --neon main-neon --pglite main-pglite --live main-live",
     "experiments:figures": "node experiments/harness/charts.mjs",
     "experiments:dashboard": "node experiments/dashboard/server.mjs",
-    "report:build": "node experiments/harness/build-report.mjs && node experiments/harness/build-report.mjs --doc literature-review"
+    "report:build": "node experiments/harness/build-report.mjs && node experiments/harness/build-report.mjs --doc literature-review && node experiments/harness/build-docx.mjs && node experiments/harness/build-docx.mjs --doc literature-review"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "concurrently": "^9.1.2",
+    "docx": "^9.15.0",
     "esbuild": "^0.27.7",
     "jstat": "^1.9.6",
     "marked": "^15.0.12",

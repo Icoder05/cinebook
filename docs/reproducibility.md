@@ -27,7 +27,7 @@ npm run stats:selftest            # 12 checks against published reference values
 npm run experiments:analyze       # raw logs → data/processed + experiments/results
 git diff --exit-code -- data/processed experiments/results   # no output = identical results
 npm run experiments:figures       # → figures/
-npm run report:build              # → docs/research-report.pdf, docs/literature-review.pdf
+npm run report:build              # → docs/research-report.pdf/.docx, docs/literature-review.pdf/.docx
 ```
 
 Independent cross-check in Python:
