@@ -17,3 +17,6 @@ __pycache__/
 .ipynb_checkpoints/
 # Generated HTML of the report sources
 docs/report-source/*.html
+
+# Word/Excel lock files
+~$*

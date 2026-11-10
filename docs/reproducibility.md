@@ -77,3 +77,14 @@ Add `--quick` to the runner for a 3-trial smoke test:
 * **Inputs** (seat choice, request order, cell execution order) derive from the fixed seed, so they are identical on every run.
 * **Analysis** is deterministic: the bootstrap uses a seeded generator, so re-running it on the same raw data gives byte-identical results.
 * **Outcomes** depend on real timing and network conditions, so a re-run of the *experiments* is expected to reproduce every qualitative conclusion, with latencies within their confidence intervals under similar network conditions.
+
+## Rebuilding the report (Windows, Microsoft Word and Excel)
+
+```bash
+npm run report:assets        # screenshots of the live site + flowchart, architecture, workflow and database diagrams
+npm run analysis:workbook    # experiments/results/cinebook-analysis.xlsx; Excel recalculates and exports the charts
+npm run report:build         # Word document from docs/report-source/REPORT.md; Word inserts citations,
+                             # IEEE bibliography, contents and lists of figures/tables, then exports the PDF
+```
+
+Close Word before `report:build`: if `docs/research-report.docx` is open, the script stops with a message.

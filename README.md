@@ -1,12 +1,16 @@
-# CineBook — preventing double bookings under concurrent demand
+# CineBook — a movie-ticket booking system and benchmark study
 
-**A BookMyShow-style ticket-booking system, and a reproducible empirical study of how such
-systems guarantee that a seat is never sold twice.**
+**A BookMyShow-style ticket-booking system, benchmarked against BookMyShow and District on web
+performance, booking workflow, accessibility and booking reliability.**
+
+Research report: *Comparative Benchmarking of Cinebook and Existing Online Movie Ticketing Platforms:
+A Study of Booking Efficiency, System Responsiveness, and Usability.*
 
 | | |
 |---|---|
 | 🎬 **Live demonstration** | https://cinebook-eight-chi.vercel.app |
-| 📄 **Research report (19 pp.)** | [PDF](docs/research-report.pdf) · [Word](docs/research-report.docx) |
+| 📄 **Research report (36 pp.)** | [PDF](docs/research-report.pdf) · [Word](docs/research-report.docx) |
+| 📊 **Analysis workbook (Excel)** | [cinebook-analysis.xlsx](experiments/results/cinebook-analysis.xlsx): raw data, formulas and every chart in the report |
 | 📚 **Literature review** | [PDF](docs/literature-review.pdf) · [Word](docs/literature-review.docx) |
 | 🧭 **Technical documentation** | [methodology](docs/methodology.md) · [system architecture](docs/system-architecture.md) · [reproducibility](docs/reproducibility.md) · [tests](tests/README.md) |
 | 📈 **Experiment dashboard** | `npm run experiments:dashboard` → http://localhost:4600 ([screenshot](figures/fig8_live_dashboard.png)) |

@@ -1,615 +1,552 @@
-<div class="title-block">
-<h1>Preventing Double Bookings under Concurrent Demand: A Multi-Dimensional Empirical Evaluation of a Serverless Ticket-Booking System</h1>
-</div>
+% Comparative Benchmarking of Cinebook and Existing Online Movie Ticketing Platforms: A Study of Booking Efficiency, System Responsiveness, and Usability
 
-<div class="columns">
+::: cover
+Research Report
+CineBook: a web-based movie ticket booking system
+November 2026
+Source code, data and analysis workbook: github.com/Icoder05/cinebook
+:::
 
-<p class="abstract"><b>Abstract.</b> When thousands of users try to buy the same seats at once, a booking system must guarantee that each seat is sold exactly once, while staying fast, reliable, secure and usable. This paper evaluates CineBook, a serverless cinema-booking system, along all of these dimensions in twelve experiments. First, seven concurrency-control strategies were compared on a cloud PostgreSQL database. Across 11 280 logged transactions, a naive read-check-write baseline double-booked in 60 of 60 contended trials, while the other six strategies produced none. CineBook's single conditional UPDATE had the lowest median latency (344 ms versus 435–445 ms) and 23% higher throughput than the next best strategy. Second, the deployed system was tested end to end. It served 13 860 requests from 10 to 500 simultaneous users without a single error. Its 95th-percentile latency stayed near 200 ms up to 50 users and rose to 1.7–1.8 s at 500. It passed all 48 failure-injection trials (declined cards, bank time-outs, dropped connections and holds expiring during payment) with no double charge and no inconsistent seat. It also passed 46 of 46 checks mapped to the OWASP API Security Top 10. Indexing a one-million-row seat table cut the seat-map query from 52.5 ms to 0.34 ms and the hold statement from 52.9 ms to 0.12 ms. Against BookMyShow and District, CineBook's public pages transferred 5–17 times fewer bytes with comparable Largest Contentful Paint. An accessibility audit found and fixed a keyboard trap, an unreachable seat grid and colour-contrast failures, taking keyboard-only booking from 0 of 3 to 3 of 3 completions. A simulation with 2 000 synthetic personas suggests that content-based ranking could raise mean reciprocal rank from 0.28 to 0.72. Finally, an embedded test database hid the double-booking defect entirely (0/15 versus 20/20 trials, p = 3×10⁻¹⁰).</p>
+::: abstract
+Online movie-ticket platforms compete on how quickly and easily a customer can go from choosing a film to holding a ticket, and on whether the ticket they pay for is really theirs. I built CineBook, a working web-based ticketing system, and compared it with two established Indian platforms, BookMyShow and District, wherever a fair comparison was possible. The study had three objectives: to compare web performance on public pages, to evaluate the booking workflow and its accessibility, and to test whether CineBook books reliably when many requests arrive at once. Every measurement was automated and repeated, for example five cold loads of each public page, ten complete bookings, twenty trials of each same-seat test and three repeats of each load level, and was analysed in an Excel workbook using means, standard deviations, percentiles, 95% confidence intervals and non-parametric tests. CineBook's pages showed their main content in a similar time to the competitors' (home page 0.98 s against 1.15 s and 1.09 s; the difference was not significant), while downloading four to five times less data. An automated accessibility audit found 8 problems on CineBook, 133 on BookMyShow and 52 on District; CineBook's were fixed. A booking on CineBook needs 8 screens and an estimated 71 s for an experienced user, and keyboard-only booking, which first failed, worked after two rounds of fixes. In a same-seat test a simple check-then-update design sold one seat to several clients in every trial, while CineBook's design never did. In a controlled load test of up to 500 simulated clients sent from one computer, all 13,860 requests succeeded, although response times rose sharply above 100 clients. The comparison with the competitors covers their public pages only; their full booking process was not measured.
+:::
 
-<p class="keywords"><b>Keywords:</b> concurrency control, double booking, PostgreSQL, serverless computing, scalability, transaction reliability, idempotency, API security, web accessibility, usability, recommender systems, performance evaluation.</p>
+Keywords: online ticketing, benchmarking, web performance, accessibility, booking workflow, concurrency, load testing, statistical analysis
 
-## 1. Introduction
+[[TOC]]
 
-Ticketing is a classic hot-spot workload: demand concentrates on a few rows—the best seats of a popular show—at the same instant. Recent launches illustrate the scale. Ticketmaster reported 3.5 billion system requests during the 2022 Eras Tour presale [15], and BookMyShow's site failed at the opening of the 2024 Coldplay India sale, when roughly 13 million users were reported to compete for about 180 000 tickets [16]. Under such contention, any gap between *checking* that a seat is free and *marking* it sold allows two buyers to purchase the same seat.
+[[LOF]]
 
-The product requirements of CineBook, the system studied here, state one non-negotiable property: two users can never book the same seat. CineBook enforces it with a single conditional UPDATE executed inside PostgreSQL. This paper first asks whether that design is (a) correct, (b) cheaper than the alternatives, and (c) correct and fast enough in the deployed system.
+[[LOT]]
 
-A booking platform is judged on much more than one invariant, however. Users notice how quickly pages appear, how many steps a booking takes and whether the site works with a keyboard or screen reader. Operators care about behaviour under load, recovery from failed payments, database cost and security. The paper therefore extends the evaluation to seven further questions:
-- web performance and accessibility compared with two market leaders;
-- booking-funnel efficiency;
-- scalability;
-- reliability under injected failures;
-- database optimisation;
-- API security;
-- the potential of personalised discovery.
+[[PAGEBREAK]]
 
-The contributions are:
-1. a pre-registered experimental comparison of seven concurrency-control strategies on a production-grade stack;
-2. an end-to-end, multi-dimensional evaluation of the deployed application, with mean, standard deviation, confidence intervals and non-parametric tests for every measure;
-3. three accessibility defects found by measurement, fixed and re-measured;
-4. an analysis of the architectural trade-offs that the measurements support;
-5. evidence that the choice of test platform determines whether the central defect is observable at all.
+# 1 Introduction
 
-## 2. Related Work
+## 1.1 Background and Motivation
 
-*A. Anomalies and Isolation.* Berenson *et al.* [1] showed that the ANSI isolation levels are ambiguous and defined anomalies such as the *lost update*—the exact failure behind double booking, in which two transactions read "available" and both write "sold." PostgreSQL's default READ COMMITTED level permits this for read-then-write logic. A single UPDATE ... WHERE status = 'AVAILABLE', however, is safe: when the target row is locked by a concurrent writer, PostgreSQL waits and re-evaluates the WHERE clause against the newly committed row version before updating [6].
+Booking cinema tickets online is now the normal way to see a film in India. A customer picks a city, a film, a theatre and a show time, chooses seats, pays and receives a ticket. The journey is short, so small problems are noticeable: a slow page, an extra screen, a button that cannot be reached without a mouse. Usability research has long held that people notice delays of about one second and lose focus after about ten [@nielsen1993], and ISO 9241-11 describes usability as the effectiveness, efficiency and satisfaction with which people reach their goals [@iso9241].
 
-*B. Pessimistic and Optimistic Control.* Two-phase locking (SELECT ... FOR UPDATE) serializes access but can deadlock when transactions acquire rows in different orders. Optimistic concurrency control [5] executes without locks, validates at commit and aborts on conflict; it is efficient when conflicts are rare and wasteful when they are frequent.
+Behind the screens there is a harder requirement: a seat must never be sold twice. When many people try to book the same popular show at once, two requests can arrive within milliseconds of each other. If the system checks that a seat is free and then marks it as sold in two separate steps, both customers may be told that the seat is theirs.
 
-*C. Serializable Snapshot Isolation.* PostgreSQL implements SERIALIZABLE with SSI [3], which detects dangerous read–write dependency cycles and aborts one participant. Its authors report performance close to snapshot isolation on read-heavy workloads, but SSI may abort transactions that did not truly conflict. Independent testing by Jepsen found G2-item anomalies in the serializable mode of PostgreSQL 12.3 [10], underlining the value of empirical checks.
+I built CineBook, a complete ticket-booking website, to study these questions on a system I could measure from end to end, and compared it with the two most widely used Indian platforms, BookMyShow and District, wherever the comparison could be made fairly.
 
-*D. Application Practice.* Bailis *et al.* [2] found that Rails applications enforce integrity mostly through application-level ("feral") checks, used over 37 times more often than transactions and often unsafe under concurrency. Warszawski and Bailis [4] demonstrated that such defects are exploitable (22 attacks in 12 applications) and are masked by low traffic. Locks held outside the database, such as Redis Redlock, add timing assumptions and require fencing tokens to be safe [11].
+## 1.2 Problem Statement
 
-*E. Measurement Methodology.* Systems measurements are noisy and easily biased: Mytkowicz *et al.* [9] showed that innocuous setup changes can reverse conclusions and recommend setup randomization. Georges *et al.* [7] and Hoefler and Belli [8] call for repeated runs, confidence intervals and non-parametric statistics. Tail latency governs user experience [12], and serverless platforms add cold starts and variable performance [13].
+Comparisons between ticketing websites are usually informal: a page "feels" slow or a process "seems" long. Such impressions are hard to repeat and easy to bias. A newly built booking system also has to show, not just assume, that it handles simultaneous bookings correctly. This study replaces impressions with repeated measurements: it measures how a newly built ticketing website performs, how much effort booking takes, how accessible it is and how reliably it books, and compares it with existing platforms where their public pages allow.
 
-*F. Web Performance and Accessibility.* Google's Core Web Vitals use Largest Contentful Paint (LCP) as the main loading metric, with 2.5 s as the "good" threshold [22]. The Web Content Accessibility Guidelines (WCAG) 2.2 [20] define testable success criteria. Among them are no keyboard trap (2.1.2), meaningful focus order (2.4.3) and a minimum text contrast of 4.5:1 (1.4.3). Automated engines such as axe-core [21] detect a subset of these rules reliably, but keyboard operation must be exercised directly. For composite widgets such as a seat grid, the WAI-ARIA Authoring Practices recommend a single Tab stop with arrow-key movement, a "roving tabindex" [25].
+## 1.3 Why the Problem Matters
 
-*G. Usability Measurement.* The System Usability Scale (SUS) is a ten-item questionnaire that yields a 0–100 score [17]. Bangor *et al.* map SUS scores to adjective ratings [18]. Where no participants are available, the Keystroke-Level Model (KLM) predicts expert task time from counts of keystrokes, pointing actions and mental preparations [19].
+For customers, slow or heavy pages cost time and mobile data, and inaccessible pages can stop some people from booking at all. For a ticketing business, a seat sold twice means a refund, an unhappy customer at the cinema door and a loss of trust. For a developer building such a system, these risks are easy to miss: everything works when one person tests the site, and the problems appear only under real conditions such as a slow connection, a keyboard instead of a mouse or many customers at once.
 
-*H. API Security and Recommendation.* The OWASP API Security Top 10 (2023) ranks the most common API risks, led by broken object-level authorization and broken authentication [23]. For discovery, content-based recommenders match item attributes to a user profile [27]. They are evaluated with rank-aware measures such as normalized discounted cumulative gain (NDCG) [24]. Paired comparisons of per-user scores are usually tested with the Wilcoxon signed-rank test [26].
+## 1.4 Research Objectives and Questions
 
-*I. Research Gap.* Prior work explains *why* naive code fails and *what* each mechanism guarantees. It rarely offers a reproducible, quantitative comparison for the seat-reservation pattern (one hot row; all-or-nothing multi-row holds) on a serverless and database-as-a-service stack, where wide-area round-trip time rather than CPU dominates cost. It seldom examines how the *test environment* affects whether such defects are visible. Booking systems are also rarely evaluated across correctness, performance, reliability, security, accessibility and discovery together, against real competitors. This study addresses these gaps.
+The study has three objectives. Each is answered by one group of experiments (Section 4).
 
-## 3. Research Questions and Hypotheses
+1. O1, web performance: how quickly and how heavily do CineBook's public pages load compared with BookMyShow and District, and how quickly does CineBook's server respond?
+2. O2, booking workflow and accessibility: how much effort does a complete booking on CineBook take, and how accessible is CineBook compared with the competitors' public pages, including for people who use only a keyboard?
+3. O3, booking reliability under concurrent use: does CineBook ever sell the same seat twice or charge a customer twice, and how does it behave as the number of simultaneous requests grows?
 
-Table I lists the twelve research questions. Hypotheses H1–H5 and the full designs of E1–E5 were fixed in a configuration file before any experiment ran. The designs of E6–E12 (factors, levels and repetitions) were added to the same file before those experiments ran; their expectations are stated here, but they were not formally pre-registered.
+## 1.5 Scope and Expected Contribution
 
-<div class="tcap">TABLE I<br><span>Research Questions, Hypotheses and Expectations</span></div>
+The study covers the web versions of the three platforms, measured from one location in India between 25 October and 31 October 2026. Competitor measurements are limited to public pages that their robots.txt files allow automated tools to load; I did not create accounts, select seats or pay on competitor sites, so their full booking process is not compared. CineBook's payment step uses a test gateway, so no real money is involved. Satisfaction measures such as the System Usability Scale (SUS) need human participants; the questionnaire and protocol are prepared (Appendix E) but have not yet been used.
 
-| | Question | Hypothesis / expectation |
+The expected contribution is a repeatable benchmark for a ticketing website, with its data, scripts and an Excel workbook, together with evidence about which design choices kept CineBook light, accessible and reliable.
+
+# 2 Literature Review
+
+The review follows the three objectives: how web performance is measured, how booking effort and accessibility are evaluated, and how booking systems prevent double sales. It ends with how this study relates to that work.
+
+## 2.1 Measuring Web Performance
+
+Google's Core Web Vitals use Largest Contentful Paint (LCP), the time until the main content of a page is drawn, as the main measure of loading speed and treat values under 2.5 s as good [@lcp]. LCP reflects what a user sees, which makes it more useful for comparing websites than the time until every file has loaded. For server responses, averages hide the slow cases that users actually notice; Dean and Barroso show why the tail of the distribution, such as the 95th or 99th percentile, should be reported [@dean2013]. Measurements of this kind are noisy. Mytkowicz et al. found that small, innocent changes in the test set-up can change conclusions [@mytkowicz2009], and Georges et al. and Hoefler and Belli recommend repeated runs, confidence intervals and statistical tests rather than single numbers [@georges2007; @hoefler2015].
+
+## 2.2 Evaluating Booking Effort and Accessibility
+
+The simplest measures of booking effort are counts of screens, clicks and keystrokes. The Keystroke-Level Model (KLM) of Card, Moran and Newell turns a sequence of such actions into an estimated time for an experienced user, using standard times for keystrokes, pointing, button presses, hand movements and mental preparation [@card1980]. Satisfaction is usually measured with the System Usability Scale, a ten-item questionnaire scored from 0 to 100 [@brooke1996], whose scores Bangor et al. relate to adjectives such as "good" or "excellent" [@bangor2009].
+
+Accessibility is defined by the Web Content Accessibility Guidelines (WCAG) 2.2, which include testable rules such as a minimum text contrast of 4.5:1 and the requirement that keyboard users are never trapped [@wcag22]. Automated engines such as axe-core check a reliable subset of these rules [@axe]. Large-scale audits such as the WebAIM Million find accessibility problems on most popular home pages, with low-contrast text the most common [@webaim]. Keyboard operation, however, has to be tested by actually using the keyboard, and for large groups of controls such as a seat map the W3C recommends a single Tab stop with arrow-key movement [@apg].
+
+## 2.3 Preventing Double Bookings
+
+Selling one seat twice is an example of a *lost update*: two transactions both read "available" and both write "sold" [@berenson1995]. Bailis et al. studied real web applications and found that many enforce such rules with checks in application code rather than in the database, and that these checks are often unsafe when requests arrive together [@bailis2015]. PostgreSQL offers several ways to make the check and the update safe, including row locks, stricter isolation levels and a single UPDATE whose condition the database re-checks while it holds the row [@pgiso]. Database design also affects speed: an index on the columns a query filters by lets the database read a few rows instead of the whole table, and a partial index covers only the rows that a query needs [@pgindex].
+
+## 2.4 How This Study Relates to Previous Work
+
+Each method above is well established, but they are rarely used together to evaluate one everyday service. This study applies them to a single ticketing system and its competitors: Web Vitals and percentile response times for performance, action counts, KLM and WCAG audits for the booking workflow, and controlled concurrency and load tests for reliability. Because I built CineBook myself, I could measure parts of the journey that the competitors do not expose, find defects and measure again after fixing them.
+
+# 3 System Overview and Architecture
+
+## 3.1 CineBook Application Overview
+
+CineBook is a complete movie-ticket booking website. It lists the films showing in four cities, with posters and details from The Movie Database (TMDB), and lets customers filter them by language, genre and format. Customers can book 1 to 10 seats for a show, pay through a test payment gateway and receive a ticket with a QR code. An administrator can manage theatres, screens and show times and check tickets in at the cinema door.
+
+## 3.2 Main Booking Workflow
+
+{fig:flow} shows the booking workflow. The important step for reliability is the seat hold: when a customer confirms their seats, CineBook reserves them for ten minutes while the customer pays. If payment is not completed in time, the seats are released for other customers.
+
+![fig:flow|1.0](../../figures/report/workflow.png) The main booking workflow in CineBook
+
+## 3.3 Technology Stack
+
+{tab:stack} lists the technologies used.
+
+Table: tab:stack CineBook technology stack
+| Layer | Technology | Purpose |
 |---|---|---|
-| RQ1 | Does each strategy prevent double booking under simultaneous requests? | **H1** baseline double-books; **H2** all others never do |
-| RQ2 | What does each correct strategy cost without collisions? | **H3** strategies differ; conditional UPDATE fastest, coarse lock slowest |
-| RQ3 | How do strategies behave with overlapping multi-seat requests? | unordered locking deadlocks; SSI over-aborts |
-| RQ4 | Is the deployed system correct and within p95 < 200 ms? | **H4** yes, for all read endpoints |
-| RQ5 | Does the test platform change the observed outcome? | **H5** an embedded, serial database hides the race |
-| RQ6 | How do page speed, weight and accessibility compare with BookMyShow and District? | lighter pages; fewer WCAG violations |
-| RQ7 | How many steps, actions and seconds does a booking take, with a mouse and with a keyboard only? | booking possible with keyboard only |
-| RQ8 | How do latency, throughput and errors change from 10 to 500 concurrent users? | no errors; latency rises with load |
-| RQ9 | Do seat holds and payments stay consistent under injected failures? | no double charge; seats always released |
-| RQ10 | Which indexes and data layouts make the hot queries fast, and at what cost? | key indexes give order-of-magnitude gains |
-| RQ11 | Does the API resist the OWASP API Top 10 attack classes? | all checks pass |
-| RQ12 | Could personalised ranking shorten film discovery? | content-based ranking beats default order |
+| Website | React, TypeScript, Tailwind CSS | pages, seat map and forms in the browser |
+| API | Node.js, Express | catalogue, seat holds, payments, tickets, sign-in |
+| Database | PostgreSQL (Neon, Singapore) | films, shows, seats, bookings and payments |
+| Hosting | Vercel CDN and serverless functions (Singapore) | delivers the website and runs the API |
+| External data | The Movie Database (TMDB) | film posters and details |
+| Testing tools | Playwright, axe-core, Node.js scripts, Excel | measurements and analysis |
 
-## 4. Methodology
+## 3.4 Architecture
 
-*A. System Under Test.* All strategies run against identical tables in an isolated research schema of the production Neon database (PostgreSQL 18.6, AWS ap-southeast-1, pooled connections). Each strategy holds 1–3 seats all-or-nothing and inserts one *claim* row per seat in the same transaction. The number of double bookings in a trial is therefore
+{fig:arch} shows how the parts fit together. The website is a single-page application delivered from Vercel's content delivery network (CDN). It calls an API that runs as serverless functions in Singapore and stores its data in a PostgreSQL database in the same region.
 
-<div class="eq">D = Σ<sub>s</sub> max(0, n<sub>s</sub> − 1), &nbsp;&nbsp;&nbsp;&nbsp;(1)</div>
+![fig:arch|0.9](../../figures/report/architecture.png) CineBook architecture and the tools used for measurement
 
-where n<sub>s</sub> is the number of committed claims on seat s. The seven strategies are:
-- *naive* (the baseline): reads, checks in application code and updates unconditionally;
-- *conditional_update*: CineBook's production logic;
-- *pessimistic_sorted*: locks rows with FOR UPDATE in seat order;
-- *pessimistic_unordered*: locks rows one at a time in request order;
-- *optimistic_version*: validates a version number;
-- *serializable*: runs the naive code under SERIALIZABLE;
-- *advisory_lock*: takes one lock per show.
+## 3.5 Database Design and Important Components
 
-*B. Experimental Design.* Table II lists the factors and levels. The procedure was:
-- each trial starts from freshly inserted seats;
-- each client owns a dedicated connection;
-- all clients are released from a barrier simultaneously;
-- one warm-up trial per cell is logged and excluded;
-- cells execute in a seeded random order to counter time-of-day drift [9];
-- inputs (seat choice and request order) derive from a fixed seed.
+{fig:db-design} shows the main tables. Two of them carry the booking logic. The show_seats table has one row for every seat in every show, with a status of AVAILABLE, HELD or BOOKED and the time a hold expires. The payments table stores an idempotency key for each payment request, which lets the system recognise a payment that is sent twice.
 
-<div class="tcap">TABLE II<br><span>Factors, Levels and Replications (Concurrency Experiments)</span></div>
+![fig:db-design|0.95](../../figures/report/database.png) Main tables of the CineBook database
 
-| Exp. | Workload | Strat. | c | Trials |
+Three components matter most for this study:
+
+- **Seat hold.** A hold is a single database statement that changes the chosen seats from AVAILABLE to HELD only if they are still available (or their earlier hold has expired), and only if all requested seats can be held. PostgreSQL re-checks this condition while it holds each row, so two customers cannot both succeed [@pgiso].
+- **Idempotent payment.** Every payment request carries a unique key. If the same request arrives twice, for example after a double click or a lost connection, the second request returns the first result instead of charging again.
+- **Signed ticket.** The QR code on a ticket contains a signature that the server checks at the cinema door, and a ticket can be checked in only once.
+
+## 3.6 Application Screenshots
+
+{fig:screens} shows four of the main screens; more are in Appendix F.
+
+![fig:screens|1.0](../../figures/report/screens.png) Main CineBook screens: (a) home page, (b) showtimes, (c) seat map and (d) confirmed ticket
+
+# 4 Research Methodology
+
+## 4.1 Research Design
+
+This is a quantitative, comparative study. CineBook is compared with BookMyShow and District where the same measurement can be made on all three platforms, and with fixed targets where it cannot: Google's 2.5 s threshold for LCP [@lcp], WCAG 2.2 level AA [@wcag22], and CineBook's own requirements of a booking in under two minutes and API responses under 200 ms at the 95th percentile. When a measurement revealed a defect in CineBook, I fixed it and repeated the measurement, so some experiments were run in several iterations (Appendix C).
+
+## 4.2 Objectives and Measurable KPIs
+
+{tab:kpi} links each objective to its key performance indicators (KPIs), the experiment that measures them and the platforms it covers.
+
+Table: tab:kpi Objectives, KPIs and experiments
+| Objective | KPI | Experiment | Platforms |
+|---|---|---|---|
+| O1 web performance | Largest Contentful Paint (ms) | E1 page loads | all three |
+| O1 web performance | page weight (KB) and number of requests | E1 page loads | all three |
+| O1 web performance | API response time, median and 95th percentile (ms) | E3 API sampling | CineBook |
+| O2 workflow and accessibility | screens, clicks, keystrokes; estimated time (s) | E4 booking runs, KLM | CineBook |
+| O2 workflow and accessibility | accessibility violations by impact | E2 accessibility audit | all three |
+| O2 workflow and accessibility | keyboard-only booking completed; Tab presses | E5 keyboard test | CineBook |
+| O3 reliability | seats sold to more than one client | E6 same-seat test, E7 live seat race | CineBook |
+| O3 reliability | double charges after failures or repeated requests | E8 payment tests | CineBook |
+| O3 reliability | errors and response time at 10 to 500 simulated clients | E9 load test | CineBook |
+
+Two outcomes were expected in advance and were tested formally: that CineBook's pages would load no slower than the competitors' while being lighter (O1), and that a check-then-update design would sell seats twice under simultaneous requests while CineBook's design would not (O3). The other KPIs were compared with the fixed targets above.
+
+## 4.3 Experimental Environment
+
+All measurements were taken from one computer in India (Intel Core i5-12400F, 16 GB RAM, Windows 10) over a home broadband connection, between 25 and 31 October 2026. CineBook ran in its normal deployed configuration on Vercel and Neon in Singapore. The median network time from the test computer was 33 ms to the CDN and 102 ms to the database. Full details are in Appendix D.
+
+## 4.4 Tools and Technologies
+
+Page loads, booking runs and keyboard tests used Playwright, which controls a real Chromium browser [@playwright]. Accessibility was checked with axe-core [@axe] against WCAG 2.0, 2.1 and 2.2 at levels A and AA. Concurrency and load tests were small Node.js scripts that send many requests at once. All results were analysed in Microsoft Excel and checked against the scripts' own calculations.
+
+## 4.5 Benchmarking Procedure
+
+The procedure was the same for every experiment:
+
+1. define the KPI, the conditions and the number of repetitions before running;
+2. run the measurement with a script, so that every repetition is identical;
+3. write every raw measurement to a log file with its time, inputs and result;
+4. delete any test accounts and bookings created on CineBook;
+5. load the raw data into the Excel workbook and calculate the statistics;
+6. if a defect was found, fix CineBook and repeat the experiment.
+
+For the competitors, only pages allowed by their robots.txt files were loaded, following the Robots Exclusion Protocol [@rfc9309]; loads were spaced four seconds apart and no attempt was made to get around bot protection. BookMyShow's film pages refused automated access, so the comparison uses BookMyShow's Bengaluru home page and District's movies page.
+
+## 4.6 Experimental Scenarios and Repetitions
+
+{tab:exp} lists the experiments. The number of repetitions was chosen to balance stable averages against the load placed on other companies' servers: five loads per competitor page is negligible for them, while CineBook could be tested more heavily.
+
+Table: tab:exp Experimental scenarios and repetitions
+| Exp. | Scenario | Conditions | Repetitions | Date |
 |---|---|---|---|---|
-| E1 | one hot seat; all clients request it | 7 | 2, 8, 32 | 20 |
-| E2 | 10-seat pool; 3 random seats each | 6 | 16 | 15 |
-| E3 | no collisions; 5 holds per client | 6 | 1, 16 | 6 |
-| E4 | live deployment over HTTPS | prod. | 1/16/5 | 3/12/6 |
-| E5 | as E1 on embedded PGlite | 3 | 8 | 15 |
+| E1 | page loads | 3 CineBook pages, 2 competitor pages; new browser profile each time | 5 per page | 30 Oct |
+| E2 | accessibility audit | same 5 pages; widths 360, 768 and 1440 px | 1 per page; repeated after fixes | 30-31 Oct |
+| E3 | API response time | 4 CineBook endpoints and one static file | 117 per endpoint | 25 Oct |
+| E4 | complete booking | desktop and mobile (Pixel 7) browser profiles | 5 per profile | 31 Oct |
+| E5 | keyboard-only booking | 3 versions of CineBook | 3 per version | 30-31 Oct |
+| E6 | same-seat test | 2, 8 or 32 clients request one seat at the same instant | 20 per level | 25 Oct |
+| E7 | live seat race | 16 test accounts request one seat on the live site | 12 | 25 Oct |
+| E8 | payment tests | repeated payment requests and six failure scenarios | 6 and 8 per scenario | 25-30 Oct |
+| E9 | controlled load test | 10, 50, 100 and 500 simulated clients; read and write | 3 per level | 30 Oct |
 
-*C. Metrics and Environment.* The metrics are:
-- double bookings (1) and lost updates;
-- aborts by SQLSTATE (deadlock 40P01, serialization failure 40001);
-- per-transaction latency and trial makespan;
-- throughput (successful holds per second);
-- server-side pg_stat_database deltas.
+E6 compares CineBook's single conditional update with a simple design that first reads whether a seat is free and then marks it sold in a second step. Both run against identical copies of the seat tables in a separate area of the cloud database, so they face exactly the same conditions. In E9, the "clients" are requests sent at the same moment by a script on one computer; they are not real customers, and that computer may itself limit how fast requests can be sent at the highest level.
 
-The client was an Intel i5-12400F (12 threads, 15.9 GB RAM, Windows 10, Node.js 24.19) in India; the median round-trip time to the database in Singapore was 102 ms. The main run took place on 25 October 2026, 04:51–05:17 UTC.
+## 4.7 Data Collection and Statistical Analysis
 
-*D. Extended Experiments.* Table III summarizes E6–E12, run on 30–31 October 2026.
+For every condition I report the number of measurements n, the mean, the sample standard deviation s, the median and, for response times, the 95th and 99th percentiles:
 
-<div class="tcap">TABLE III<br><span>Design of the Extended Experiments (E6–E12)</span></div>
+$$ x̄ = (1/n) Σ x_i,    s = √( Σ (x_i − x̄)² / (n − 1) ) $$
 
-| Exp. | Area | Target | Procedure | Replication |
-|---|---|---|---|---|
-| E6 | web performance, accessibility, responsiveness | CineBook home, movie and seat map; BookMyShow home; District movies | cold-cache Chromium loads; axe-core WCAG 2.2 A/AA audit; overflow at 360, 768 and 1440 px | 5 loads per page, 4 s apart |
-| E7 | booking funnel, usability, keyboard access | live CineBook | instrumented sign-in-to-ticket booking; KLM time [19]; keyboard-only booking | 5 desktop, 5 mobile, 3 keyboard |
-| E8 | scalability | live CineBook | 10, 50, 100, 500 simultaneous users; read (seat map ×5) and write (hold + release, distinct seats) | 3 repeats, random cell order |
-| E9 | seat locking, transaction reliability | live CineBook | six injected failure scenarios plus database invariant checks | 8 trials each, random order |
-| E10 | database optimisation | Neon, separate schema | 1 M show-seat rows, 200 000 bookings; EXPLAIN ANALYZE of index and layout variants | 30 timed runs after 3 warm-ups |
-| E11 | security | local API on PGlite; live headers and stored data | 46 checks mapped to the OWASP API Top 10 [23] | 1 run (deterministic) |
-| E12 | discovery | real catalogue of 12 films | 2 000 synthetic personas; four ranking policies; HR@3, MRR, NDCG@5 [24] | 3 preference-noise levels |
+Response times are skewed: most requests are fast and a few are much slower ({fig:hist}). In such data the mean is pulled up by the slow requests, so the median and the 95th percentile describe what users experience better, and rank-based tests are more appropriate than tests that assume a normal distribution.
 
-Several design details matter for interpreting the results:
-- **E6.** Each load used a fresh browser context with no throttling. Largest Contentful Paint was read from the browser's PerformanceObserver.
-- **E7.** Robot timings measure system response, not people, so human time is estimated with KLM. The operator values are K = 0.28 s, P = 1.1 s, B = 0.1 s, H = 0.4 s and M = 1.35 s.
-- **E8.** Research accounts made the requests through a browser-grade HTTP client from one machine.
-- **E9.** The fake gateway gives deterministic outcomes: a card ending 0000 is declined, and one ending 1111 settles but answers only after 20 s. Hold expiry was injected by moving the hold deadline in the database.
-- **E10.** Times are server-side execution times, so they exclude the network.
-- **E12.** This is a simulation. Each persona has a hidden utility over films, based on language and two favourite genres with Gumbel noise, and books the film with the highest utility. The ranking policies see only what an application could see: the chosen language and two noisy genre "likes".
+![fig:hist|0.75](../../figures/report/xl_seatmap_hist.png) Distribution of 117 seat-map response times (E3)
 
-All research accounts, bookings and synthetic tables were deleted after each run.
+A 95% confidence interval for a mean is x̄ ± t × s / √n, where t comes from Student's t-distribution with n − 1 degrees of freedom. For example, CineBook's home page had a mean LCP of 980.8 ms with s = 220.4 ms over five loads; with t = 2.776 the interval is 707 to 1,254 ms. Intervals this wide are normal with five loads and are a reason to be careful about small differences.
 
-*E. Ethics and Competitor Data.* Competitor sites were measured only on public pages that their robots.txt files permit. Loads were spaced 4 s apart. No accounts, seat holds or checkout pages were used, and no bot-protection mechanism was bypassed. BookMyShow's film page refused automated access, so it was excluded. Funnel steps and SUS for the competitors therefore require human participants. A protocol, questionnaire, data sheet and scoring script are provided in the repository, and the paper reports no SUS score for any platform.
+Platforms were compared with the Kruskal-Wallis test [@kruskal1952], and pairs of platforms with the Mann-Whitney U test [@mann1947], using Holm's correction when several pairs were compared [@holm1979]. Cliff's delta [@cliff1993] shows how large a difference is: −1 means every value in one group was smaller than every value in the other. Proportions such as "trials with a double booking" use Wilson confidence intervals [@brown2001]. A difference was treated as real only when p < 0.05 after correction. All calculations are in the Excel workbook (Appendix B), where each result is a visible formula; the main tests are listed in Appendix C.
 
-*F. Statistical Analysis.* The analyses are:
-- **Proportions:** Wilson 95% intervals [14]; zero-event outcomes use the rule of three, with upper bound ≈ 3/n.
-- **Latencies:** these are skewed, so medians and 95th percentiles are reported with percentile-bootstrap intervals (B = 2000). Small samples of repeated measurements are summarized as mean ± standard deviation (SD) with Student-t 95% intervals.
-- **Group comparisons:** independent groups use the Kruskal–Wallis test, then pairwise Mann–Whitney U tests with Holm correction. Cliff's δ is the effect size (|δ| ≥ 0.474 is large).
-- **Paired comparisons:** these use the Wilcoxon signed-rank test, with effect size r = |z|/√n.
-- **Trends:** Spearman's ρ.
-- **Two-group proportions:** Fisher's exact test.
+## 4.8 Experimental Flowchart
 
-The statistics module passes 15 checks against published or SciPy reference values. An independent re-analysis in Python agreed on all 154 reported figures of E1–E5.
+{fig:process} summarises the research process. The loop on the right is the iteration step: when interpretation showed a defect, CineBook was fixed and the experiment was run again.
 
-*G. Data Management.* Every transaction attempt is appended to a JSON-lines log with:
-- run identifier, sequence number and timestamp;
-- inputs, outcome, SQLSTATE and error text;
-- latency.
+![fig:process|0.6](../../figures/report/flowchart.png) Research process followed in this study
 
-Every trial adds counts, makespan, client CPU and memory. Every run has a manifest recording:
-- the code version and software versions;
-- hardware and database host;
-- network samples and execution order.
+# 5 Results and Findings
 
-Validation against the design found the following:
-- E1–E5: 12 020 log lines, none unparseable, no invalid latencies and no missing cells; 39 warm-up trials excluded.
-- E6–E12: 38 854 log lines, none unparseable, and no request errors.
+This chapter reports what was observed. The meaning of the results is discussed in Chapter 6.
 
-A live dashboard (Fig. 8) streamed progress, outcome mix, latency percentiles and iteration-wise makespan during the runs, refreshing as each transaction was logged.
+## 5.1 Comparative Web Performance
 
-<figure><img src="../../figures/fig8_live_dashboard.png"><figcaption>Fig. 8. Real-time experiment dashboard captured during the main run (13% complete): progress, double bookings per strategy, outcome mix, latency percentiles, iteration-wise trial makespan and latency distribution.</figcaption></figure>
+{fig:lcp} shows the mean LCP of each page with its standard deviation. All five pages showed their main content in less than half of the 2.5 s "good" threshold. CineBook's home page had the lowest mean of the three home pages (981 ms against 1,153 ms for BookMyShow and 1,090 ms for District), but the difference was not statistically significant (Kruskal-Wallis H = 1.52, p = 0.47). BookMyShow's results varied most: its first two loads downloaded 121 files and its later loads 65 to 68, which gave it the largest standard deviation (513 ms). CineBook's seat map was the fastest page measured (473 ms).
 
-## 5. Results
+![fig:lcp|0.75](../../figures/report/xl_lcp.png) Largest Contentful Paint per page, mean ± SD of five cold loads (E1)
 
-*A. Correctness under Contention (RQ1).* The baseline double-booked in every contended trial: 60 of 60 (Wilson 95% CI 94.0–100%). Every client won the seat—mean winners per trial were 2, 8 and 32—producing 780 double bookings in E1 and 571 in E2. The other six strategies produced zero double bookings across 75 trials and 1080 transactions each (advisory lock: 60 trials, 840 transactions), a per-trial upper bound of 4% (5%) at 95% confidence. Against the conditional UPDATE the difference is decisive (Fisher's exact p = 2.1×10⁻³⁵). H1 and H2 are supported (Fig. 1).
+{fig:weight} shows how much data each page downloaded. CineBook's home page transferred 695 KB, against 3,594 KB for BookMyShow and 2,933 KB for District. Every one of CineBook's five loads was lighter than every competitor load (Cliff's δ = −1; Holm-corrected p = 0.032 for both comparisons). Most of the competitors' extra weight was JavaScript (3,062 KB and 1,644 KB, against 120 KB), and their pages contacted 17 to 26 other servers, against 2 to 3 for CineBook.
 
-<figure><img src="../../figures/fig1_double_bookings.png"><figcaption>Fig. 1. Mean double bookings per trial versus concurrent clients (E1). The six non-baseline strategies overlap at zero; the baseline grows as c − 1.</figcaption></figure>
+![fig:weight|0.75](../../figures/report/xl_page_weight.png) Data transferred per page by type of file (E1)
 
-The cost of correctness grows with contention because losers must wait for the winner's lock (Fig. 2). At c = 32 the conditional UPDATE, optimistic and pessimistic strategies cluster at a p95 of 2.9–3.0 s, while the advisory lock (5.7 s) and the baseline (5.6 s) are slowest. SERIALIZABLE stays near 0.5 s only because it aborts losers immediately, with abort rates of 50%, 88% and 97% at c = 2, 8 and 32; each loser receives an error that the application must handle or retry.
+## 5.2 Booking Workflow Evaluation
 
-<figure><img src="../../figures/fig2_hot_seat_latency.png"><figcaption>Fig. 2. 95th-percentile transaction latency under contention (E1), by strategy and concurrency (log scale).</figcaption></figure>
+A complete booking on CineBook, from signing in to seeing the ticket, passed through 8 screens and 2 small dialogs and needed 17 clicks or taps and 77 keystrokes, 34 of them for card details. Driven by a script, the website took 4.5 ± 0.3 s on the desktop profile and 4.7 ± 0.3 s on the mobile profile, including a 1.5 s simulated bank delay; the two did not differ significantly (p = 0.60). The fee and tax breakdown was shown before payment in all ten runs.
 
-*B. Overlapping Multi-Seat Requests (RQ3).* With 16 clients each requesting 3 of 10 seats (Fig. 3), unordered locking deadlocked on 93 of 240 requests (38.8%), confirmed by 101 deadlocks in PostgreSQL's own statistics (including the warm-up trial), and its p95 latency rose to 5.4 s. SERIALIZABLE sold only 3.0 seats per trial versus 6.8–7.4 for the other correct strategies, aborting 93.8% of requests even when a non-overlapping allocation existed. The conditional UPDATE, sorted locking and optimistic validation behaved alike, with no deadlocks. The baseline "sold" 9.9 of 10 seats per trial but with 38 double bookings per trial.
+{fig:klm} shows the Keystroke-Level Model estimate for an experienced user: 71 s in total, within the two-minute requirement. Signing in and paying took 70% of this time, almost all of it typing. Choosing the city, film, show and seats took about 21 s.
 
-<figure><img src="../../figures/fig3_multi_seat_outcomes.png"><figcaption>Fig. 3. Outcome of every request with overlapping three-seat requests (E2, c = 16).</figcaption></figure>
+![fig:klm|0.75](../../figures/report/xl_klm.png) Estimated time per booking stage for an experienced user (Keystroke-Level Model)
 
-*C. Cost without Collisions (RQ2).* When clients never collide, the cost is overhead, dominated here by network round trips. The strategies differed significantly (Kruskal–Wallis H = 1936, df = 5, p < 10⁻³⁰⁰ at c = 16; H = 154, p < 10⁻³⁰ at c = 1). The conditional UPDATE was fastest, with a median of 344 ms [342, 347] at c = 16 versus 435–445 ms for the baseline, sorted locking, optimistic validation and SERIALIZABLE (Fig. 4). All pairwise differences were significant after Holm correction (largest adjusted p = 4.4×10⁻⁷, baseline versus conditional at c = 1), with large effects (Cliff's δ = 0.76–1.00; 0.96–1.00 at c = 16).
+The same measures could not be taken on BookMyShow or District, because their booking pages could not be automated within the ethical limits of this study (Section 4.5).
 
-<figure><img src="../../figures/fig4_low_contention_latency.png"><figcaption>Fig. 4. Latency without collisions (E3, c = 16). Box: interquartile range; dot: median; cross: 95th percentile (log scale).</figcaption></figure>
+## 5.3 Accessibility Evaluation
 
-The conditional UPDATE also delivered the highest throughput, 38.3 holds/s [36.8, 39.8]—23% above sorted locking (31.1) and 26% above optimistic validation (30.5) (Fig. 5). The advisory lock serializes the whole show and fell to 2.8 holds/s, 13.5 times lower. SERIALIZABLE aborted 24 of 480 (5.0%) non-conflicting transactions, false positives of SSI's coarse conflict tracking. H3 is supported. The mechanism is simple: the conditional UPDATE decides and writes in one statement, whereas read-then-write strategies need an extra round trip per hold.
+{fig:a11y} shows the number of page elements that broke a WCAG 2.2 A or AA rule. CineBook's three pages had 8 serious problems, all text with too little contrast: the brand pink gave 3.5:1 under white text, below the required 4.5:1. BookMyShow's home page had 133 problems, 126 of them contrast. District's movies page had 52, of which 38 were critical, mostly form fields and buttons without a label that a screen reader could announce. Both competitors also prevent zooming on mobile. After CineBook's colours were darkened, a repeated audit found no problems. None of the five pages scrolled sideways at 360, 768 or 1440 px width.
 
-<figure><img src="../../figures/fig5_throughput.png"><figcaption>Fig. 5. Throughput in successful holds per second with 95% bootstrap confidence intervals (E3).</figcaption></figure>
+![fig:a11y|0.75](../../figures/report/xl_accessibility.png) Elements breaking a WCAG 2.2 A or AA rule, by impact (E2)
 
-*D. The Deployed System (RQ4).* In 12 trials, 16 real user accounts raced through the public API for one seat; all 12 trials had exactly one winner (192 requests, no errors, no double bookings). Losers received HTTP 409, and every seat returned to *available* after release. Hold latency was 146 ms at the median and 352 ms at the 95th percentile. In 6 trials of five simultaneous payment submissions sharing one idempotency key, each produced exactly one HTTP 200, four HTTP 409 responses and one payment record; later retries were recognized as replays in 6 of 6 cases, with no double charges. Latency was measured end to end from the client (Table IV, Fig. 6); a static file served by the CDN gives the network baseline (median 33 ms).
+The keyboard-only test ({fig:kbd}) found three problems that the automated audit had not:
 
-<div class="tcap">TABLE IV<br><span>Live Read Latency (117 Warm Samples per Endpoint)</span></div>
+- In the original version, a "Welcome back" notification caught the Tab key in an endless loop, and none of three attempts could finish.
+- After that was fixed, every one of the roughly 120 seats on the seat map was a separate Tab stop, so getting past the seat map took well over 100 presses; no attempt finished (one reached the payment page but was then stopped by an error in my test script, which I corrected).
+- After the seat map was changed to one Tab stop with arrow keys [@apg], and focus was moved to the new page after each navigation, all three attempts finished with 90 to 116 Tab presses.
 
-| Endpoint | p50 (ms) | p95 (ms) [95% CI] | < 200 ms | Target met |
-|---|---|---|---|---|
-| health | 118 | 150 [140, 153] | 98.3% | yes |
-| movies | 38 | 60 [52, 84] | 99.1% | yes |
-| showtimes | 124 | 146 [138, 175] | 99.1% | yes |
-| seats | 123 | 200 [144, 417] | 94.9% | not shown |
+![fig:kbd|0.65](../../figures/report/xl_keyboard.png) Mean Tab presses in keyboard-only booking across three versions of CineBook (E5)
 
-H4 is partially supported. Three endpoints meet p95 < 200 ms with their whole interval below the target. The seat map's p95 lies on the boundary and its interval reaches 417 ms, driven by occasional responses of up to 1.8 s.
+## 5.4 Concurrency and Booking Reliability
 
-<figure><img src="../../figures/fig6_live_latency_cdf.png"><figcaption>Fig. 6. Cumulative distribution of live end-to-end latency (E4a); the dashed line marks the 200 ms target.</figcaption></figure>
+{fig:conc} shows the result of the same-seat test (E6). With the check-then-update design, every client that asked for the seat was told it was theirs: one extra sale per trial with 2 clients, 7 with 8 clients and 31 with 32 clients, in 60 of 60 trials (Wilson 95% CI 94-100%). With CineBook's single conditional update, exactly one client got the seat in every trial and the others were refused, with no double bookings in 60 of 60 trials (upper 95% bound 6%; Fisher's exact test p < 0.001). CineBook's design was also faster: its median time with 8 clients was 629 ms against 1,016 ms for the check-then-update design. Two other safe approaches, row locks and the strictest isolation level, are compared in Appendix C.
 
-*E. Platform Effect (RQ5).* Running the identical baseline code with 8 clients on the embedded PGlite database used for local development produced 0 of 15 trials with double bookings, versus 20 of 20 on Neon (Fisher's exact p = 3.1×10⁻¹⁰; Fig. 7). PGlite executes one transaction at a time, so the race window never opens. H5 is supported: a test suite that passes on an embedded database demonstrates logic, not concurrency safety.
+![fig:conc|0.75](../../figures/report/xl_concurrency.png) Seats sold more than once per trial when several clients request the same seat (E6)
 
-<figure><img src="../../figures/fig7_platform.png"><figcaption>Fig. 7. Share of trials with at least one double booking on networked PostgreSQL and embedded PGlite (c = 8). PGlite values are zero for all strategies.</figcaption></figure>
+On the live website (E7), 16 test accounts asked for the same seat at the same moment, twelve times. Every time exactly one account got the seat and fifteen were refused; no seat was sold twice. In the payment tests (E8), five identical payment requests sent at once always produced exactly one payment (6 of 6 trials), and all 48 failure tests passed: declined cards, a bank that did not answer, a lost connection, a hold that expired during payment, an expired hold taken by another customer and a request for seats of which one was already taken (Appendix C). No customer was charged twice, and no seat was left in an inconsistent state.
 
-*F. Web Performance and Accessibility versus Competitors (RQ6).* Table V and Figs. 9–10 compare the five public pages.
+## 5.5 Scalability and Performance
 
-Largest Contentful Paint did not differ detectably between the three home pages (Kruskal–Wallis H = 1.52, df = 2, p = 0.47). All pages were well inside the 2.5 s "good" threshold [22]. CineBook's seat map was the fastest page at 473 ± 97 ms.
+**Server response time.** {fig:api} shows CineBook's API response times. The movie list was the fastest (median 38 ms). The other endpoints took 118 to 124 ms at the median, of which about 33 ms was network time. Three endpoints met the 200 ms target at the 95th percentile; the seat map was exactly on the limit (200 ms), with 94.9% of its responses under 200 ms and a few slow responses of up to 1.8 s.
 
-Page weight did differ (H = 12.6, p = 0.0018). The CineBook home page transferred 695 KB, against 3 594 KB for BookMyShow and 2 933 KB for District (Holm-adjusted p = 0.032 for both comparisons, Cliff's δ = −1). The competitors also loaded 25–30 times more JavaScript and contacted 17–26 third-party hosts, against 3. The number of requests followed the same pattern (H = 9.96, p = 0.0069).
+![fig:api|0.75](../../figures/report/xl_api_latency.png) CineBook API response time, median and 95th percentile, against the 200 ms target (E3)
 
-The comparison is of pages, not of products: CineBook's catalogue is 12 films in four cities, whereas the competitors serve whole regions and carry advertising and analytics.
+**Controlled load test.** {fig:load} shows how response times changed as the number of simultaneous simulated clients grew from 10 to 500. All 13,860 requests succeeded, with no errors (95% upper bound 0.03%). Up to 50 clients, the median stayed between 125 and 167 ms and the 95th percentile around 200 ms. Above 100 clients the slowest requests grew much faster than the typical ones: at 500 clients the median was 309 ms for reads and 428 ms for writes, while the 95th percentile reached 1.7 and 1.8 s. Throughput rose from about 65 to about 470 requests per second for reads, but varied a lot between repeats at the higher levels (Appendix A).
 
-<div class="tcap">TABLE V<br><span>Public-Page Performance, Mean of 5 Cold Loads (E6)</span></div>
+![fig:load|0.75](../../figures/report/xl_load.png) Response time against the number of simulated concurrent clients, sent from one computer (E9)
 
-| Page | LCP (ms), mean ± SD | FCP (ms) | TTFB (ms) | Transfer (KB) | JS (KB) | Requests | 3rd-party hosts |
-|---|---|---|---|---|---|---|---|
-| CineBook home | 981 ± 220 | 477 | 194 | 695 | 120 | 29 | 3 |
-| CineBook movie | 1038 ± 263 | 486 | 129 | 339 | 119 | 20 | 3 |
-| CineBook seat map | 473 ± 97 | 473 | 150 | 212 | 123 | 14 | 2 |
-| BookMyShow home | 1153 ± 513 | 333 | 286 | 3594 ± 141 | 3062 | 88 | 26 |
-| District movies | 1090 ± 128 | 634 | 305 | 2933 | 1644 | 84 | 17 |
+**Database indexing.** As a supporting test, the main queries were timed on a synthetic table of one million seat rows. Without an index, drawing one seat map took 52.5 ms; with an index on show and seat it took 0.34 ms. Holding two seats became 456 times faster and listing a customer's bookings about 200 times faster with suitable indexes (Appendix A). CineBook's live database already uses these indexes.
 
-<figure><img src="../../figures/fig9_web_lcp.png"><figcaption>Fig. 9. Largest Contentful Paint per page, mean ± SD of five cold loads (E6).</figcaption></figure>
+# 6 Discussion
 
-<figure><img src="../../figures/fig10_page_weight.png"><figcaption>Fig. 10. Bytes transferred per page by resource type (E6).</figcaption></figure>
+## 6.1 Interpretation of Results
 
-The axe-core audit (Table VI, Fig. 11) counted affected elements, not rules:
-- **CineBook before fixes:** 8 serious colour-contrast violations across its three pages. The brand pink (#F84464) gave only 3.5:1 under white button text.
-- **BookMyShow home page:** 133 affected elements, 126 of them contrast failures.
-- **District:** 52, of which 38 were critical: form fields without labels and elements whose ARIA attributes did not fit their role.
+For web performance (O1), CineBook was as fast as the competitors but not demonstrably faster: with five loads per page, a difference of 100 to 200 ms could easily go undetected. The difference in page weight, by contrast, was large and consistent, and its cause is clear: the competitors load several megabytes of JavaScript and many third-party services, such as advertising and analytics, that CineBook does not have. The two results together suggest that this extra code does not make the competitors' pages appear faster, but it does make them heavier, which matters most on slow or metered mobile connections.
 
-Both competitors also disable pinch-zoom in their viewport settings. No page overflowed horizontally at 360, 768 or 1440 px.
+For the booking workflow (O2), the result I expected was that the number of screens would decide booking time. The KLM estimate showed otherwise: most of an experienced user's time goes into typing an e-mail address, a password and card details. The keyboard test was the most revealing part of the study. CineBook passed its automated tests and, after the colour change, its automated accessibility audit, yet a customer who cannot use a mouse could not have booked a ticket at all.
 
-CineBook's colours were then darkened to meet 4.5:1, and the audit was repeated: all three pages had zero violations. LCP after the change was 921, 1076 and 494 ms, unchanged within noise.
+For reliability (O3), the same-seat test showed that the double-booking problem is not theoretical: the simple design failed in every trial, and the number of extra sales grew with the number of clients. CineBook's single statement prevented this without slowing bookings down. The load test showed that the deployed system stayed correct up to 500 simulated clients, but that its slowest responses grew quickly above about 100.
 
-<div class="tcap">TABLE VI<br><span>WCAG 2.2 A/AA Violations Found by axe-core (Affected Elements)</span></div>
+## 6.2 Comparison with Existing Studies
 
-| Page | Rules | Critical | Serious | Moderate | Main rules violated |
+All three platforms stayed close to Nielsen's one-second limit for keeping a user's flow of thought [@nielsen1993] on most loads, and well inside Google's 2.5 s threshold [@lcp], so for users the three are likely to feel similarly fast; the difference that remains is in how much data each page costs. The accessibility results also match the WebAIM Million, where low-contrast text is the most frequent problem [@webaim]; it was the most frequent problem on CineBook and BookMyShow too. The failure of the check-then-update design is the lost update described by Berenson et al. [@berenson1995] and matches the unsafe application-level checks that Bailis et al. found in real applications [@bailis2015]. Finally, the load test shows the effect Dean and Barroso describe: as load rises, the tail of the response-time distribution grows much faster than the median [@dean2013], which is why the 95th percentile, not the average, is the measure to watch.
+
+## 6.3 Important Observations
+
+Three observations stand out. First, the most serious usability problem, the keyboard trap, was invisible to every automated check and was found only by using the website in a different way. Second, the first attempt at almost every experiment needed correction: test accounts that were already signed in, a test card number that the payment form rejected, and timing in the keyboard script. Keeping every raw measurement made these problems visible instead of quietly producing wrong numbers. Third, the testing platform mattered: the same check-then-update code that failed on the cloud database never failed on the small embedded database used during development, because that database handles one request at a time (Appendix C).
+
+## 6.4 Engineering Trade-offs
+
+{tab:tradeoffs} summarises the main design choices behind these results and what each one costs.
+
+Table: tab:tradeoffs Design choices, evidence and trade-offs
+| Design choice | Alternative | Evidence from this study | Cost accepted |
+|---|---|---|---|
+| seat ownership decided by one database statement | check in application code, then update | no double bookings in 60 trials; check-then-update failed in 60 of 60 | every hold needs a round trip to the database |
+| 10-minute seat hold, released automatically | release only by a scheduled job | expired holds were reclaimed immediately in 8 of 8 tests | expired rows remain until touched or cleaned |
+| idempotency key on every payment | disable the pay button in the browser | one charge in every repeated-payment and failure test | the client must keep and resend the key |
+| serverless hosting | an always-running server | no errors up to 500 simulated clients | slow responses grow above 100 clients; cold starts |
+| small single-page website | feature-rich pages with third-party services | 4 to 5 times less data, similar LCP | fewer features; focus must be managed by the app |
+| normalised tables with indexes | copying seat details into every show | key queries under 1 ms on one million rows | one extra join when drawing the seat map |
+
+## 6.5 Practical Implications
+
+For developers of booking systems, the results suggest four practical rules: let the database decide who owns a seat in one statement; make every payment request safe to repeat; keep pages light, because extra code did not make pages appear faster; and test with a keyboard, because automated checks do not find every barrier. For CineBook itself, the next improvements are to reduce typing (for example by staying signed in) and to make the seat-map query faster so that its slowest responses fall clearly below 200 ms.
+
+# 7 Limitations and Threats to Validity
+
+## 7.1 Experimental Limitations
+
+The comparison with BookMyShow and District covers their public landing pages only. Their booking process, keyboard operation and response under load could not be measured without creating accounts, holding seats or getting around bot protection, which this study did not do. The booking-effort results are therefore for CineBook alone. The KLM estimate describes an experienced user who makes no mistakes; real users, especially first-time users, will take longer. No human participants took part, so satisfaction, one of the three parts of usability [@iso9241], was not measured.
+
+## 7.2 Dataset and Sample Limitations
+
+Only five loads were made of each competitor page, which keeps the load on their servers negligible but limits statistical power; small differences in LCP may exist without being detected. Live tests used small numbers of trials (12 seat races, 6 repeated-payment trials and 8 trials per failure scenario), so they show that failures are rare, not that they are impossible. The database indexing test used synthetic data, and CineBook's catalogue of 12 films is much smaller than the competitors', which affects page content and weight.
+
+## 7.3 Testing Environment Limitations
+
+All measurements came from one computer at one location over one week, so absolute times include that location's network and may differ elsewhere. The load test sent all requests from that one computer: the "500 clients" were simulated requests, not 500 real customers on different networks, and the computer itself may have limited the request rate at the highest level. The competitors' pages may also have changed between loads, as BookMyShow's varying number of files suggests.
+
+## 7.4 Generalizability of Results
+
+The results describe these three websites at one point in time. The finding that lighter pages did not load more slowly, and the design lessons for preventing double bookings, are likely to apply to other booking websites, but the exact numbers will not. CineBook was built by the author of this study; to reduce this bias, every measurement was automated, every result can be traced to raw data, and the competitors were measured with exactly the same scripts.
+
+# 8 Conclusion and Future Work
+
+## 8.1 Summary of Findings
+
+CineBook's pages showed their main content about as quickly as BookMyShow's and District's while downloading four to five times less data. A booking takes 8 screens and an estimated 71 s for an experienced user, most of it typing. CineBook had far fewer accessibility problems than either competitor, and three keyboard problems were found and fixed. Its seat-hold design never sold a seat twice in any test, unlike a simple check-then-update design, and the deployed system answered all requests in a controlled load test of up to 500 simulated clients, with slower responses above 100.
+
+## 8.2 Whether the Objectives Were Achieved
+
+{tab:objectives} summarises how far each objective was met.
+
+Table: tab:objectives Achievement of the research objectives
+| Objective | Achieved? | Main evidence |
+|---|---|---|
+| O1 web performance | mostly | similar LCP (p = 0.47), 4-5 times lighter (p = 0.032); API met the target on 3 of 4 endpoints |
+| O2 workflow and accessibility | partly | CineBook measured fully (71 s, 0 violations after fixes, keyboard booking works); competitors compared on public pages only |
+| O3 reliability under concurrent use | yes, within the tested limits | no double booking or double charge in any test; no errors up to 500 simulated clients |
+
+## 8.3 Main Contribution
+
+The main contribution is a repeatable benchmark for a ticketing website, with the scripts, raw data and an Excel workbook in which every number can be traced to its calculation. Its findings show that a small booking site can match established platforms on loading speed with far lighter pages, that typing rather than the number of screens dominates booking effort, that keyboard testing finds problems automated audits miss, and that seat ownership should be decided by the database in a single statement.
+
+## 8.4 Improvements and Future Investigations
+
+Future work should:
+
+1. run the prepared protocol with 8 to 12 participants to measure booking time and SUS scores on all three platforms, which would complete the comparison of the booking experience (Appendix E);
+2. repeat the page measurements from several cities and on a real mobile network;
+3. repeat the load test from several computers, so that the client does not limit the request rate;
+4. optimise the seat-map query so that its 95th percentile falls clearly below 200 ms;
+5. measure the effect of reducing typing, such as staying signed in or saved payment methods, on booking time.
+
+# References
+
+[[BIBLIOGRAPHY]]
+
+# Appendix A: Detailed Experimental Data
+
+Table: tab:a1 Page-load results per page, mean of five cold loads (E1)
+| Page | LCP mean ± SD (ms) | LCP 95% CI (ms) | FCP (ms) | TTFB (ms) | Transfer (KB) | JavaScript (KB) | Requests | Third-party hosts |
+|---|---|---|---|---|---|---|---|---|
+| CineBook home | 981 ± 220 | 707 – 1,254 | 477 | 194 | 695 | 120 | 29 | 3 |
+| CineBook film | 1,038 ± 263 | 711 – 1,364 | 486 | 129 | 339 | 119 | 20 | 3 |
+| CineBook seat map | 473 ± 97 | 353 – 593 | 473 | 150 | 212 | 123 | 14 | 2 |
+| BookMyShow home | 1,153 ± 513 | 516 – 1,789 | 333 | 286 | 3,594 | 3,062 | 88 | 26 |
+| District movies | 1,090 ± 128 | 931 – 1,250 | 634 | 305 | 2,933 | 1,644 | 84 | 17 |
+
+FCP is First Contentful Paint (first text or image drawn); TTFB is Time to First Byte (first response from the server).
+
+Table: tab:a2 Accessibility violations per page (E2)
+| Page | Rules broken | Critical | Serious | Moderate | Rules (affected elements) |
 |---|---|---|---|---|---|
-| CineBook, 3 pages, before | 1 | 0 | 8 | 0 | colour contrast |
-| CineBook, 3 pages, after | 0 | 0 | 0 | 0 | — |
-| BookMyShow home | 3 | 0 | 132 | 1 | contrast (126), link name (6), zoom disabled |
-| District movies | 8 | 38 | 13 | 1 | missing labels (28), ARIA misuse (16), zoom disabled |
+| CineBook home, before | 1 | 0 | 1 | 0 | colour contrast (1) |
+| CineBook film, before | 1 | 0 | 3 | 0 | colour contrast (3) |
+| CineBook seat map, before | 1 | 0 | 4 | 0 | colour contrast (4) |
+| CineBook, all pages, after | 0 | 0 | 0 | 0 | none |
+| BookMyShow home | 3 | 0 | 132 | 1 | colour contrast (126), link without name (6), zoom disabled (1) |
+| District movies | 8 | 38 | 13 | 1 | missing form labels (28), ARIA misuse (16), button without name (2), colour contrast (3), other (3) |
 
-<figure><img src="../../figures/fig11_accessibility.png"><figcaption>Fig. 11. Elements violating WCAG 2.2 A/AA rules, by impact (E6).</figcaption></figure>
-
-*G. Booking Funnel and Keyboard Access (RQ7).* A complete booking runs from sign-in to the ticket, through home, film, showtimes, seat map, booking summary and payment. Mouse or touch users needed (Table VII):
-- 8 screens and 2 dialogs (city and seat count);
-- 17 clicks or taps and 77 keystrokes, of which 34 were card details.
-
-The system itself took 4.52 ± 0.32 s on desktop and 4.73 ± 0.26 s on a mobile profile (Mann–Whitney p = 0.60); this includes a 1.5 s simulated bank delay. KLM predicts 71.4 s for an expert user, 49.8 s of which comes after sign-in and 28.6 s of which is checkout. Typing is therefore the largest single cost. The fee and tax breakdown was visible before payment in 10 of 10 runs.
-
-Competitor funnels could not be measured within the ethical limits above, so their columns are left to the human protocol rather than estimated.
-
-<div class="tcap">TABLE VII<br><span>Booking Funnel, Sign-in to Ticket (E7, 5 Runs per Device)</span></div>
-
+Table: tab:a3 Booking runs by device, mean of five runs (E4)
 | Measure | Desktop | Mobile (Pixel 7) |
 |---|---|---|
-| Screens / dialogs | 8 / 2 | 8 / 2 |
 | Clicks or taps / keystrokes | 17 / 77 | 17 / 77 |
-| System time (s), mean ± SD [95% CI] | 4.52 ± 0.32 [4.12, 4.91] | 4.73 ± 0.26 [4.40, 5.05] |
-| KLM expert time (s): total / after sign-in / checkout | 71.4 / 49.8 / 28.6 | 71.4 / 49.8 / 28.6 |
-| Fee and tax shown before payment | 5 of 5 | 5 of 5 |
-| BookMyShow, District | not measured (checkout not automatable; protocol provided) | — |
+| System time, mean ± SD [95% CI] (s) | 4.52 ± 0.32 [4.12, 4.91] | 4.73 ± 0.26 [4.40, 5.05] |
+| Sign-in / discovery / showtime (s) | 1.05 / 0.06 / 0.52 | 1.06 / 0.06 / 0.50 |
+| Seats / checkout including 1.5 s bank delay (s) | 0.67 / 2.21 | 0.78 / 2.32 |
+| Fee and tax breakdown shown before payment | 5 of 5 | 5 of 5 |
 
-The keyboard-only test exposed three defects that automated scanning had not found (Table VIII):
-1. **A keyboard trap.** The notification library returned focus to the previously focused element whenever focus left a toast. With a toast on screen, the Tab key therefore cycled between the last link and the toast indefinitely (WCAG 2.1.2).
-2. **Lost focus after navigation.** After client-side navigation, focus stayed where the old page's element had been (WCAG 2.4.3).
-3. **An unreachable Pay button.** Every seat was a separate Tab stop, so reaching the Pay button took more than 400 key presses.
+Table: tab:a4 CineBook API response time, 117 warm requests per endpoint (E3)
+| Endpoint | Mean ± SD (ms) | Median (ms) | p95 (ms) | p99 (ms) | Max (ms) | Under 200 ms |
+|---|---|---|---|---|---|---|
+| Health check | 123 ± 26 | 119 | 150 | 234 | 346 | 98.3% |
+| Movie list | 42 ± 22 | 38 | 60 | 86 | 242 | 99.1% |
+| Showtimes | 127 ± 16 | 124 | 146 | 193 | 230 | 99.1% |
+| Seat map | 152 ± 176 | 123 | 200 | 833 | 1,822 | 94.9% |
+| Static file (CDN, 27 requests) | 37 ± 17 | 33 | 54 | 96 | 110 | 100% |
 
-The fixes, all verified by the end-to-end tests, were:
-- toasts were removed from the Tab order (they remain announced to screen readers);
-- focus now moves to the main region on navigation, with a skip link;
-- the seat map became a single Tab stop with arrow-key movement [25].
-
-After the fixes, 3 of 3 keyboard-only bookings succeeded, with 90–116 Tab presses (mean 100), 4 of them inside the seat map. No focus stop lacked a visible focus indicator.
-
-<div class="tcap">TABLE VIII<br><span>Keyboard-Only Booking Before and After the Fixes (E7, 3 Runs Each)</span></div>
-
-| Version | Completed | Tab presses | Where it failed |
-|---|---|---|---|
-| Original | 0 of 3 | 450–474, then trapped | trapped by toast on film page |
-| Toast trap fixed | 0 of 3 | 483–610 | seat grid (one Tab stop per seat) |
-| All fixes | 3 of 3 | 90–116 (seat map: 4) | — |
-
-*H. Scalability (RQ8).* Across 24 randomized cells, the deployed system answered all 13 860 requests successfully. That is 0 errors, with a 95% upper bound of 0.03% (Table IX).
-
-Latency stayed flat up to 50 users: the median was 125–167 ms and the p95 150–230 ms. It rose beyond that (Fig. 12). At 500 simultaneous users the p95 was 1.72 s for reads and 1.80 s for writes. Latency increased monotonically with load (Spearman ρ = 0.84 for reads, p = 0.0006; ρ = 0.97 for writes, p = 1.4×10⁻⁷, over the per-repeat p95 values). Throughput grew sub-linearly, from 65 to 466 requests/s for reads and from 68 to 371 holds or releases/s for writes (Fig. 13). Variation between repeats grew at higher load.
-
-Every write touched a distinct seat. The database invariants (below) found no seat in an inconsistent state after the run.
-
-<div class="tcap">TABLE IX<br><span>Scalability on the Live Deployment (E8, 3 Repeats per Cell)</span></div>
-
-| Workload | Users | Requests | Errors | p50 (ms) | p95 (ms) | p99 (ms) | Throughput (req/s), mean ± SD |
+Table: tab:a5 Controlled load test, simulated clients sent from one computer (E9)
+| Workload | Clients | Requests | Errors | Median (ms) | p95 (ms) | p99 (ms) | Throughput, mean ± SD (req/s) |
 |---|---|---|---|---|---|---|---|
-| read | 10 | 150 | 0 | 125 | 211 | 251 | 65 ± 10 |
-| read | 50 | 750 | 0 | 128 | 203 | 236 | 299 ± 34 |
-| read | 100 | 1500 | 0 | 164 | 349 | 1024 | 364 ± 91 |
-| read | 500 | 7500 | 0 | 309 | 1716 | 2702 | 466 ± 171 |
-| write | 10 | 60 | 0 | 126 | 150 | 182 | 68 ± 4 |
-| write | 50 | 300 | 0 | 167 | 230 | 242 | 219 ± 22 |
-| write | 100 | 600 | 0 | 175 | 458 | 518 | 275 ± 102 |
-| write | 500 | 3000 | 0 | 428 | 1805 | 1924 | 371 ± 167 |
+| read (seat map) | 10 | 150 | 0 | 125 | 211 | 251 | 65 ± 10 |
+| read (seat map) | 50 | 750 | 0 | 128 | 203 | 236 | 299 ± 34 |
+| read (seat map) | 100 | 1,500 | 0 | 164 | 349 | 1,024 | 364 ± 91 |
+| read (seat map) | 500 | 7,500 | 0 | 309 | 1,716 | 2,702 | 466 ± 171 |
+| write (hold and release) | 10 | 60 | 0 | 126 | 150 | 182 | 68 ± 4 |
+| write (hold and release) | 50 | 300 | 0 | 167 | 230 | 242 | 219 ± 22 |
+| write (hold and release) | 100 | 600 | 0 | 175 | 458 | 518 | 275 ± 102 |
+| write (hold and release) | 500 | 3,000 | 0 | 428 | 1,805 | 1,924 | 371 ± 167 |
 
-<figure><img src="../../figures/fig12_scalability_latency.png"><figcaption>Fig. 12. Median (dashed) and 95th-percentile (solid) latency versus concurrent users (E8).</figcaption></figure>
+Table: tab:a6 Database query time on one million seat rows, 30 runs per variant
+| Query | Variant | Mean ± SD (ms) | Median (ms) | Speed-up |
+|---|---|---|---|---|
+| Seat map | no index | 53.9 ± 3.8 | 52.49 | 1 |
+| Seat map | index (show, seat) | 0.342 ± 0.021 | 0.339 | 155 x |
+| Hold two seats | no index | 53.6 ± 2.3 | 52.92 | 1 |
+| Hold two seats | index (show, seat) | 0.116 ± 0.013 | 0.116 | 456 x |
+| Release expired holds | no index | 97.5 ± 8.7 | 93.97 | 1 |
+| Release expired holds | partial index, 0.34 MB | 56.2 ± 19.7 | 49.54 | 1.9 x |
+| My bookings | no index | 16.0 ± 6.1 | 14.32 | 1 |
+| My bookings | index (user, date) | 0.069 ± 0.006 | 0.068 | 211 x |
+| Seat map with layout | normalised, 3-table join | 6.69 ± 0.17 | 6.64 | 1 |
+| Seat map with layout | denormalised, 1 table | 0.813 ± 0.075 | 0.822 | 8.1 x |
+| Change a ticket price | normalised | 0.127 ± 0.014 | 0.124 | 1 |
+| Change a ticket price | denormalised | 39.0 ± 28.4 | 32.94 | 266 x slower |
 
-<figure><img src="../../figures/fig13_scalability_throughput.png"><figcaption>Fig. 13. Throughput versus concurrent users, mean ± SD of three repeats (E8).</figcaption></figure>
+# Appendix B: Excel Calculation Workbook
 
-*I. Seat-Lock and Transaction Reliability (RQ9).* All 48 failure-injection trials passed (Wilson 95% CI 92.6–100%; Table X). The scenarios behaved as follows:
-- **Declined card:** marked the payment failed and released the seat within one request.
-- **Bank time-out:** the client gave up after 8 s. A retry with the same idempotency key 0.31 ± 0.06 s later returned the original successful result as a replay. Exactly one charge was recorded.
-- **Dropped connection at 300 ms:** retries saw "payment in progress" twice and then the single successful result, 1.56 ± 0.06 s after the drop.
-- **Hold expiring during payment:** refunded automatically and released the seat. All 8 trials ended with 0 charges and 1 refund.
-- **Expired hold:** another user could claim the seat at once (156 ms). The original holder's late payment was refused with HTTP 410.
-- **Overlapping three-seat request:** rejected as a whole, leaving the two free seats untouched.
+All tables, calculations and charts in this report were built in the Excel workbook experiments/results/cinebook-analysis.xlsx in the project repository. Each sheet holds the raw measurements on the left and the summary on the right; every summary cell is a formula, so clicking on a number shows how it was calculated (for example =AVERAGE, =STDEV.S, =PERCENTILE.INC and =T.INV.2T for confidence intervals). The statistical tests are built step by step from ranks on sheet 8_Stats_Tests.
 
-Database-wide invariant queries after E8 and E9 found:
-- 0 sold seats without a confirmed booking;
-- 0 bookings with more than one successful payment;
-- 0 confirmed bookings whose seat count disagreed with their sold seats;
-- 0 holds without an owner.
+Table: tab:b1 Sheets of the analysis workbook
+| Sheet | Contents | Used for |
+|---|---|---|
+| 1_PageLoads | 25 page loads; mean, SD and 95% CI per page | {fig:lcp}, {fig:weight}, {tab:a1} |
+| 2_Accessibility | violations per page and impact, before and after fixes | {fig:a11y}, {tab:a2} |
+| 3_API_Latency | 117 requests per endpoint; percentiles; histogram | {fig:hist}, {fig:api}, {tab:a4} |
+| 4_Funnel | 10 booking runs; summary by device | {tab:a3} |
+| 5_KLM | operator times and estimated time per stage | {fig:klm} |
+| 6_Keyboard | keyboard-only attempts across three versions | {fig:kbd} |
+| 7_DB_Queries | 30 runs per query variant; speed-up | {tab:a6} |
+| 8_Stats_Tests | Kruskal-Wallis and Mann-Whitney tests built from ranks | {tab:c2} |
+| 9_Supplementary | payment failure tests and security checks | {tab:c3}, {tab:c4} |
+| 10_Concurrency | same-seat test and live seat race | {fig:conc}, {tab:c1} |
+| 11_LoadTest | 13,860 load-test requests; percentiles and throughput | {fig:load}, {tab:a5} |
 
-<div class="tcap">TABLE X<br><span>Failure-Injection Results on the Live Deployment (E9, 8 Trials per Scenario)</span></div>
+# Appendix C: Additional Tables and Graphs
 
-| Scenario | Passed | Charges | Refunds | Latency (ms), mean ± SD | Final state |
+Table: tab:c1 Same-seat test: four approaches, 20 trials per level (E6)
+| Approach | Clients | Trials with a double booking | Seats sold twice (total) | Requests refused with an error | Median time (ms) | p95 time (ms) |
+|---|---|---|---|---|---|---|
+| Check, then update | 2 / 8 / 32 | 20 / 20 / 20 | 20 / 140 / 620 | 0% | 651 / 1,016 / 3,111 | 724 / 1,680 / 5,608 |
+| CineBook conditional update | 2 / 8 / 32 | 0 / 0 / 0 | 0 | 0% | 382 / 629 / 1,594 | 440 / 951 / 2,874 |
+| Row locks (SELECT FOR UPDATE) | 2 / 8 / 32 | 0 / 0 / 0 | 0 | 0% | 449 / 703 / 1,677 | 496 / 995 / 2,956 |
+| Strictest isolation (SERIALIZABLE) | 2 / 8 / 32 | 0 / 0 / 0 | 0 | 50% / 88% / 97% | 512 / 493 / 482 | 577 / 525 / 533 |
+
+The strictest isolation level was fast only because it rejected most requests with an error, which the website would then have to retry. The same check-then-update test run on the small embedded database used during development produced no double bookings in 15 of 15 trials, against 20 of 20 on the cloud database (Fisher's exact test p < 0.001), because the embedded database handles one request at a time.
+
+Table: tab:c2 Main statistical tests
+| Comparison | Test | Statistic | p-value | Effect size | Result |
 |---|---|---|---|---|---|
-| Declined card | 8/8 | 0 | 0 | 1640 ± 7 | booking failed, seat free |
-| Bank time-out, client abort at 8 s, retry | 8/8 | 8 (1 each) | 0 | recovery 306 ± 63 | confirmed, seat sold |
-| Connection dropped at 300 ms, retry | 8/8 | 8 (1 each) | 0 | recovery 1561 ± 56 | confirmed, seat sold |
-| Hold expires during payment | 8/8 | 0 | 8 | 1639 ± 15 (HTTP 410) | expired, seat free |
-| Expired hold reclaimed by another user | 8/8 | 0 | 0 | 156 ± 50 | new holder owns seat |
-| Multi-seat hold with one seat taken | 8/8 | 0 | 0 | 135 ± 34 (HTTP 409) | other seats untouched |
+| Home-page LCP, 3 platforms | Kruskal-Wallis | H = 1.52, df = 2 | 0.468 | | no significant difference |
+| Home-page transfer size, 3 platforms | Kruskal-Wallis | H = 12.64, df = 2 | 0.002 | | significant |
+| Transfer size, CineBook vs BookMyShow | Mann-Whitney | U = 0 | 0.032 (Holm) | δ = −1 | CineBook smaller |
+| Transfer size, CineBook vs District | Mann-Whitney | U = 0 | 0.032 (Holm) | δ = −1 | CineBook smaller |
+| Booking time, desktop vs mobile | Mann-Whitney | | 0.600 | | no significant difference |
+| Double bookings, check-then-update vs CineBook | Fisher's exact | 60/60 vs 0/60 trials | < 0.001 | | CineBook safer |
+| Load test: clients vs p95 response time | Spearman | ρ = 0.84 (read), 0.97 (write) | < 0.001 | | p95 rises with load |
 
-*J. Database Optimisation (RQ10).* On a synthetic table of one million show-seat rows (Table XI, Fig. 14), each index or layout change was tested against its baseline. All differences were significant after Holm correction (p ≤ 2×10⁻⁹, except where noted below).
-- **Seat-map read:** the composite primary key (showtime, seat) turned a 52.5 ms parallel sequential scan into a 0.34 ms index scan, 155× faster.
-- **Conditional-UPDATE hold:** became 456× faster (52.9 to 0.12 ms).
-- **"My bookings":** an index on user cut the query from 14.3 to 0.074 ms; the composite (user, date) index removed the sort (0.068 ms).
-- **Expiry sweep:** this releases about 7 600 seats, so writing dominates its cost. Indexes helped only 1.7–1.9×. However, a partial index on held seats was 20 times smaller than a full index (0.34 versus 6.86 MB) and no slower.
-- **Denormalization:** copying seat layout into each show-seat row made the seat map 8.1× faster (0.82 versus 6.64 ms). It cost 20% more storage (129 versus 108 MB), and a price change became 266× slower, because one tier update had to touch every future show seat.
-- **Index maintenance:** four secondary indexes made bulk seat creation 2.5× slower (56.7 versus 22.7 ms per 10 000 rows). The partial index added nothing measurable.
-- **Isolation level:** this did not change the cost of an uncontended hold (248, 249 and 246 ms; Holm p = 1).
+Table: tab:c3 Payment and seat-hold failure tests, eight trials per scenario (E8)
+| Scenario | Passed | Charges | Refunds | Final state |
+|---|---|---|---|---|
+| Card declined | 8 / 8 | 0 | 0 | booking failed, seat released |
+| Bank does not answer; customer retries | 8 / 8 | one per booking | 0 | booking confirmed once |
+| Connection lost during payment; customer retries | 8 / 8 | one per booking | 0 | booking confirmed once |
+| Seat hold expires during payment | 8 / 8 | 0 | 8 | booking expired, seat released |
+| Expired hold taken by another customer | 8 / 8 | 0 | 0 | new customer holds the seat |
+| Request for three seats when one is taken | 8 / 8 | 0 | 0 | request refused, other seats untouched |
 
-CineBook's production schema already uses the winning variants: the composite key, the partial expiry index and the composite booking index.
-
-<div class="tcap">TABLE XI<br><span>Server-Side Execution Time per Variant, 30 Runs (E10)</span></div>
-
-| Query | Variant | Mean ± SD (ms) | Median (ms) | Speed-up | Plan |
-|---|---|---|---|---|---|
-| seat map | no index | 53.9 ± 3.8 | 52.49 | 1 | parallel seq. scan |
-| seat map | primary key | 0.342 ± 0.021 | 0.339 | 155× | index scan |
-| hold, 2 seats | no index | 53.6 ± 2.3 | 52.92 | 1 | seq. scan |
-| hold, 2 seats | primary key | 0.116 ± 0.013 | 0.116 | 456× | index scan |
-| expiry sweep | no index | 97.5 ± 8.7 | 93.97 | 1 | seq. scan |
-| expiry sweep | full index (6.86 MB) | 57.9 ± 9.3 | 54.46 | 1.7× | index scan |
-| expiry sweep | partial index (0.34 MB) | 56.2 ± 19.7 | 49.54 | 1.9× | index scan |
-| my bookings | no index | 16.0 ± 6.1 | 14.32 | 1 | seq. scan + sort |
-| my bookings | (user) | 0.074 ± 0.010 | 0.074 | 194× | index scan + sort |
-| my bookings | (user, date) | 0.069 ± 0.006 | 0.068 | 211× | index scan |
-| seat map + layout | normalized, 3-table join | 6.69 ± 0.17 | 6.64 | 1 | hash joins |
-| seat map + layout | denormalized | 0.813 ± 0.075 | 0.822 | 8.1× | index scan |
-| tier price change | normalized | 0.127 ± 0.014 | 0.124 | 1 | 3 rows |
-| tier price change | denormalized | 39.0 ± 28.4 | 32.94 | 0.004× | thousands of rows |
-
-<figure><img src="../../figures/fig14_db_optimisation.png"><figcaption>Fig. 14. Median server-side execution time before and after optimisation on one million seat rows (E10, log scale).</figcaption></figure>
-
-*K. Security (RQ11).* All 46 checks passed (Table XII). The checks covered:
-- **Object-level access:** users could not read, pay for, cancel or release another user's booking or hold.
-- **Token attacks:** edited claims, alg = none, a wrong key and expired tokens were all rejected.
-- **Refresh tokens:** these rotate on each use. A replay after the 10 s multi-tab grace window revoked the whole token family.
-- **Login:** brute force was limited after five failures, and unknown e-mails and wrong passwords produced identical replies.
-- **Mass assignment:** role and e-mail fields in sign-up and profile requests were ignored.
-- **Limits:** oversized bodies, pages and holds were refused.
-- **Admin functions:** customers could not call them.
-- **Injection:** SQL injection and stored-script payloads had no effect.
-- **Headers:** the live site sent HSTS, a Content-Security-Policy, nosniff and frame protection, with no server banner and no reflected CORS origin.
-- **Card data:** the live database stores only the last four card digits and has no CVV or card-number column.
-
-QR tickets now carry an HMAC signature and are admitted once, atomically. The two pre-fix designs, a bare booking code and a forged signature, are both rejected. One documented trade-off remains: after logout, a stateless access token still works on read-only routes until it expires (at most 15 min). Payment and cancellation routes re-check the session and refused it.
-
-<div class="tcap">TABLE XII<br><span>Security Checks by OWASP API Security Top 10 (2023) Category (E11)</span></div>
-
+Table: tab:c4 Supporting security checks, grouped by OWASP API Security Top 10 (2023) category
 | Category | Checks | Passed | Examples |
 |---|---|---|---|
-| API1 Broken object-level authorization | 5 | 5 | another user's booking, payment, hold |
-| API2 Broken authentication | 14 | 14 | tampered or unsigned JWT, refresh reuse, brute force |
-| API3 Broken property-level authorization | 4 | 4 | role mass-assignment, hash or card exposure |
-| API4 Unrestricted resource consumption | 3 | 3 | 150 KB body, page size, 11-seat hold |
-| API5 Broken function-level authorization | 3 | 3 | customer calling admin endpoints |
-| API6 Sensitive business flows (tickets) | 4 | 4 | forged or replayed QR ticket |
-| API8 Security misconfiguration | 7 | 7 | HSTS, CSP, CORS, error leakage |
-| Injection and data at rest | 6 | 6 | SQL injection, stored XSS, stored card data |
+| Access to other users' data | 5 | 5 | reading or cancelling another user's booking |
+| Authentication | 14 | 14 | edited or expired login tokens, repeated wrong passwords |
+| Hidden fields | 4 | 4 | trying to make oneself an administrator at sign-up |
+| Resource limits | 3 | 3 | very large requests, holding more than 10 seats |
+| Administrator functions | 3 | 3 | customer calling administrator pages |
+| Tickets | 4 | 4 | forged or reused QR tickets |
+| Configuration | 7 | 7 | security headers, error messages |
+| Injection and stored card data | 6 | 6 | database injection; only the last four card digits are stored |
 
-*L. Personalised Discovery (RQ12).* This result comes from a simulation, so it estimates potential benefit, not observed behaviour. Ranking films by language match and genre "likes" placed the persona's preferred film in the first three positions for 89.2% of personas, against 32.5% for the current release-date order (Table XIII, Fig. 15). It also reduced the scrolling needed on a two-column phone grid from 2.1 to 0.3 rows.
+The categories follow the OWASP API Security Top 10 [@owasp2023]. These checks were run on a local copy of the API and on the live site's headers; they are a targeted test, not a full penetration test.
 
-A plain language filter, which CineBook could add at once, recovered most of the gain (HR@3 71.7%). Popularity ranking helped little (42.0%). Paired Wilcoxon tests on reciprocal rank favoured the content-based policy over every baseline at every noise level (all Holm p < 10⁻¹⁵). The effects were large against default order and popularity (r = 0.62–0.78) and moderate against the language filter (r = 0.31–0.60).
+Table: tab:c5 Iteration log: what was measured, what happened and what was changed
+| Iteration | Measured | What happened | Action taken |
+|---|---|---|---|
+| 1 | API response time (E3) | 3 of 4 endpoints under 200 ms at p95; seat map on the limit | recorded as an open issue |
+| 2 | Competitor pages (E1) | BookMyShow film pages refused automated access | comparison limited to public landing pages |
+| 3 | Page speed and accessibility (E1, E2) | all CineBook pages failed colour contrast (8 elements) | brand colours darkened |
+| 4 | Booking runs (E4) | first runs failed because test accounts were already signed in | test script corrected; runs repeated |
+| 5 | Payment failure tests (E8) | one scenario failed because the test card number was invalid | test card corrected; all scenarios repeated |
+| 6 | Keyboard-only booking (E5) | Tab key trapped by a notification | notification removed from the Tab order; focus moved on navigation |
+| 7 | Keyboard-only booking (E5) | about 120 separate Tab stops on the seat map | seat map made one Tab stop with arrow keys |
+| 8 | All CineBook checks repeated | 0 accessibility violations; keyboard booking 3 of 3 | final results |
 
-The advantage shrank as preferences became noisier: MRR was 0.80, 0.72 and 0.62 at the three noise levels. The scoring rule shares its structure with the simulated preferences, so these figures are an upper bound until real interaction data are available.
+# Appendix D: Testing Configurations
 
-<div class="tcap">TABLE XIII<br><span>Discovery Quality by Ranking Policy, 2 000 Personas, Noise 0.5 (E12), Mean [95% CI]</span></div>
+Table: tab:d1 Measurement environment
+| Item | Value |
+|---|---|
+| Client computer | Intel Core i5-12400F, 16 GB RAM, Windows 10, home broadband in India |
+| Browser | Chromium controlled by Playwright 1.64; desktop 1366 x 860, mobile Pixel 7 profile |
+| Accessibility engine | axe-core 4.14, rules for WCAG 2.0, 2.1 and 2.2 at levels A and AA |
+| CineBook hosting | Vercel (CDN and serverless functions, Singapore); Neon PostgreSQL 18 (Singapore) |
+| Network baseline | median 33 ms to the CDN, 102 ms to the database |
+| Competitor pages | in.bookmyshow.com/explore/home/bengaluru; www.district.in/movies/ |
+| Dates | 25 October 2026 (API, concurrency); 30-31 October 2026 (all other experiments) |
 
-| Policy | HR@3 | MRR | NDCG@5 | Rows scrolled |
-|---|---|---|---|---|
-| Default (release date) | 0.325 [0.304, 0.345] | 0.281 [0.270, 0.291] | 0.342 [0.332, 0.352] | 2.12 |
-| Popularity | 0.420 [0.399, 0.442] | 0.366 [0.352, 0.379] | 0.426 [0.414, 0.439] | 1.78 |
-| Language filter | 0.717 [0.697, 0.736] | 0.545 [0.531, 0.560] | 0.716 [0.707, 0.726] | 0.73 |
-| Content-based | 0.892 [0.879, 0.906] | 0.716 [0.702, 0.729] | 0.838 [0.830, 0.846] | 0.29 |
+All code, raw data and analysis files are in the project's GitHub repository. Each experiment can be repeated with one command, for example npm run experiments:web for the page measurements, and the analysis and charts can be rebuilt from the committed data without access to any website. The repository's reproducibility guide lists every command, its expected run time and the data it produces.
 
-<figure><img src="../../figures/fig15_recsim.png"><figcaption>Fig. 15. Hit rate at 3, mean reciprocal rank and NDCG at 5 for each ranking policy, with 95% confidence intervals (E12, simulation).</figcaption></figure>
+# Appendix E: Questionnaires and Testing Protocols
 
-## 6. Architecture and Trade-offs
+**E.1 System Usability Scale.** After using each platform, a participant rates the ten statements in {tab:sus} from 1 (strongly disagree) to 5 (strongly agree) [@brooke1996]. Odd items score the rating minus 1, even items score 5 minus the rating, and the sum is multiplied by 2.5 to give a score from 0 to 100.
 
-CineBook has three parts:
-- a React single-page application served from a CDN;
-- an Express API running as serverless functions in Singapore;
-- a pooled serverless PostgreSQL database (Neon).
+Table: tab:sus System Usability Scale statements
+| No. | Statement |
+|---|---|
+| 1 | I think that I would like to use this system frequently. |
+| 2 | I found the system unnecessarily complex. |
+| 3 | I thought the system was easy to use. |
+| 4 | I think that I would need the support of a technical person to be able to use this system. |
+| 5 | I found the various functions in this system were well integrated. |
+| 6 | I thought there was too much inconsistency in this system. |
+| 7 | I would imagine that most people would learn to use this system very quickly. |
+| 8 | I found the system very cumbersome to use. |
+| 9 | I felt very confident using the system. |
+| 10 | I needed to learn a lot of things before I could get going with this system. |
 
-All correctness-critical decisions are taken inside the database. Table XIV sets each architectural choice against its main alternative, the evidence gathered in this study and the cost that the choice accepts.
+**E.2 Booking-task protocol (all three platforms).**
 
-<div class="tcap">TABLE XIV<br><span>Architectural Decisions, Alternatives and Measured Trade-offs</span></div>
+1. Recruit 8 to 12 adults who have booked a cinema ticket online in the past year; record only an anonymous code, age band and how often they book.
+2. Vary the order of the platforms between participants so that each platform is used first, second and third equally often.
+3. Give the same task on every platform: find a 2D evening show of any film in Bengaluru tomorrow, choose two seats next to each other and continue to the payment page. Participants stop at the payment page and never pay.
+4. Record task time, screens seen, taps or clicks, errors (wrong turns or going back) and whether the fee breakdown was visible before payment.
+5. Straight after each platform, the participant completes the SUS questionnaire.
 
-| Concern | CineBook choice | Alternative | Evidence | Cost accepted |
-|---|---|---|---|---|
-| Seat ownership | one conditional UPDATE in PostgreSQL | row locks, SERIALIZABLE, Redis lock | 0 double bookings; 344 ms; +23% throughput (E1–E3) | every hold needs a database round trip |
-| Hold expiry | expired holds reclaimed inline; periodic sweep | timer-only release | reclaim 8/8 in 156 ms (E9); partial index 0.34 MB (E10) | expired rows stay until touched |
-| Compute | serverless functions | always-on server | 0 errors up to 500 users (E8) | p95 1.7–1.8 s at 500 users; cold starts |
-| Database | pooled serverless PostgreSQL | embedded or self-hosted database | embedded DB hides races (E5) | ~100 ms network round trip per statement |
-| Payments | idempotency key + one live payment per booking | disable button on client | 0 double charges in 30 submits and 16 failure retries (E4, E9) | clients must keep and resend the key |
-| Sessions | 15-min JWT + session check on money routes | server session on every request | 46/46 checks (E11) | read routes usable ≤ 15 min after logout |
-| Tickets | HMAC-signed QR, atomic one-time check-in | look up plain booking code | forged and replayed tickets rejected (E11) | secret rotation invalidates old tickets |
-| Data model | normalized layout + per-show seat state | denormalized seat map | reads 8.1× slower than denormalized but 6.6 ms (E10) | one extra join on the seat map |
-| Front end | client-rendered SPA, small bundle | server-rendered pages | 5–17× lighter than competitors (E6) | needs explicit focus management (E7) |
+**E.3 Keyboard-only protocol (CineBook).** Starting from the sign-in page, complete a booking for two seats using only Tab, Shift+Tab, Enter, Space, the arrow keys and typing. Record whether the booking finishes, the number of Tab presses, and every point where the keyboard focus is lost, trapped or not visible.
 
-Two trade-offs deserve emphasis. First, the serverless deployment absorbed a 50-fold increase in load without errors, but its tail latency at 500 users was about eight times that at 50. A flash sale would need a virtual waiting room, or regional database replicas for reads. Second, normalization keeps price changes cheap and storage small. Denormalizing the seat map would save only about 6 ms per request on the server, which is small next to the measured network latency, so the normalized design remains the better default.
+# Appendix F: Additional Screenshots
 
-## 7. Discussion
-
-*A. Findings.* The main findings are:
-- **Correctness.** Read-check-write in application code is not an edge-case risk: under simultaneous demand it oversold in every trial, and the damage scaled with the number of buyers. Every database-enforced strategy was correct, so the choice among them concerns cost and failure behaviour.
-- **The best strategy.** For seat reservation on a high-latency serverless stack, the conditional UPDATE dominated: correct, fastest, highest throughput, with no deadlocks and no false aborts. Unordered locking added deadlocks, SERIALIZABLE added aborts that reduced seats sold, and a coarse lock destroyed throughput.
-- **Integrity in the deployed system.** It preserved seat and payment integrity under real concurrent traffic, under failure injection and at 500 simultaneous users, and it resisted every tested attack class.
-- **Quality versus large incumbents.** A small, carefully built system can match them on loading speed with a fraction of the page weight and far fewer accessibility violations.
-- **Where defects hide.** Some of the most user-relevant defects were invisible to unit tests, end-to-end tests and automated accessibility scanning alike. They appeared only when the booking was actually operated with a keyboard, just as the double-booking defect appeared only on a truly concurrent database.
-
-*B. Threats to Validity.*
-- **Single load source.** All load came from one machine in India. Absolute latencies include a wide-area round trip of about 100 ms, so relative differences generalize better than absolute values. In E8 the single load generator may itself limit the request rate at 500 users. The tail-latency growth therefore marks an upper bound for one client site, not a server capacity limit.
-- **Database setup.** A single Neon compute size and a connection pooler were used.
-- **No retries.** Strategies were implemented without automatic retries; with retries, SERIALIZABLE and optimistic control would sell more seats at higher latency.
-- **Concurrency range.** E1–E3 used at most 32 clients, whereas flash sales are far larger and normally shaped by virtual queues.
-- **Sample sizes.** Live samples were small: 12 races, 6 payment trials, 8 trials per failure scenario and 3 repeats per scalability cell. They are reported with intervals.
-- **Competitor comparison.** This covers public landing pages only, measured five times from one location on one day.
-- **Usability.** The usability figures are system timings and KLM predictions, not observations of people, and no SUS data were collected.
-- **Discovery.** The recommendation result is a simulation with assumed audience shares and preference structure.
-- **Database data.** The E10 data set is synthetic, although sized like a busy city.
-- **Security.** The security suite is a targeted test, not a penetration test.
-
-*C. Practical Impact.* For booking and inventory systems, the evidence supports four rules:
-1. Let one conditional statement in the database decide ownership.
-2. Make every payment request idempotent.
-3. Index exactly the hot predicates, using partial indexes for sparse states.
-4. Test against a real concurrent database and with a keyboard.
-
-For CineBook, the core requirement is now supported by measurement. Three accessibility defects were removed. The open items are tail latency above 100 users and the seat-map endpoint's 95th percentile. A language filter on the home page is the cheapest discovery improvement.
-
-## 8. Conclusion and Future Work
-
-This study compared seven concurrency-control strategies for seat reservation under controlled, repeated experiments. It then evaluated the deployed system across web performance, accessibility, usability, scalability, reliability, database design, security and discovery. The naive baseline failed in every contended trial, while database-enforced strategies were uniformly correct. Among them, the single conditional UPDATE offered the best latency and throughput without deadlocks or false aborts.
-
-The deployed system:
-- served 13 860 requests at up to 500 simultaneous users without an error;
-- survived 48 injected failures with no double charge;
-- passed 46 security checks;
-- loaded as fast as BookMyShow and District with 5–17 times fewer bytes.
-
-The evaluation also found and fixed a keyboard trap, an unreachable seat grid and contrast failures. The results show that embedded test databases can conceal concurrency defects.
-
-Future work will:
-- repeat the load tests from several regions behind a virtual queue;
-- add retry policies to measure goodput;
-- run the provided SUS and competitor-funnel protocol with 8–12 participants;
-- deploy the language filter and an A/B test of content-based ranking on real interactions;
-- optimize the seat-map query to bring its 95th percentile below 200 ms.
-
-All code, the experimental designs, raw logs, analysis outputs and figure scripts are available in the project repository to support independent replication.
-
-## Appendix: Detailed Results
-
-Tables XV–XVII report every configuration of the database experiments, generated directly from the analysis outputs in the repository:
-- DB denotes double bookings.
-- Abort rate counts deadlock and serialization failures over all transactions.
-- Intervals are 95% percentile-bootstrap intervals.
-- Holm p is the Holm-adjusted Mann–Whitney p-value against the conditional UPDATE at the same concurrency.
-
-Per-request data for E6–E12 are in data/processed.
-
-<div class="tcap">TABLE XV<br><span>Hot-Seat Results per Configuration (E1, 20 Trials per Row)</span></div>
-
-| Strategy | c | Trials w/ DB | DB total | Abort rate | p50 (ms) | p95 (ms) [95% CI] |
-|---|---|---|---|---|---|---|
-| naive | 2 | 20/20 | 20 | 0.0% | 651 | 724 [703, 972] |
-| naive | 8 | 20/20 | 140 | 0.0% | 1016 | 1680 [1642, 1697] |
-| naive | 32 | 20/20 | 620 | 0.0% | 3111 | 5608 [5493, 5697] |
-| cond. UPDATE | 2 | 0/20 | 0 | 0.0% | 382 | 440 [433, 450] |
-| cond. UPDATE | 8 | 0/20 | 0 | 0.0% | 629 | 951 [935, 961] |
-| cond. UPDATE | 32 | 0/20 | 0 | 0.0% | 1594 | 2874 [2791, 2918] |
-| pess. sorted | 2 | 0/20 | 0 | 0.0% | 449 | 496 [478, 527] |
-| pess. sorted | 8 | 0/20 | 0 | 0.0% | 703 | 995 [969, 1020] |
-| pess. sorted | 32 | 0/20 | 0 | 0.0% | 1677 | 2956 [2903, 3005] |
-| pess. unordered | 2 | 0/20 | 0 | 0.0% | 449 | 504 [490, 526] |
-| pess. unordered | 8 | 0/20 | 0 | 0.0% | 726 | 1037 [1018, 1045] |
-| pess. unordered | 32 | 0/20 | 0 | 0.0% | 1680 | 2942 [2886, 2985] |
-| optimistic | 2 | 0/20 | 0 | 0.0% | 442 | 511 [507, 520] |
-| optimistic | 8 | 0/20 | 0 | 0.0% | 659 | 986 [960, 1006] |
-| optimistic | 32 | 0/20 | 0 | 0.0% | 1665 | 2979 [2895, 3006] |
-| serializable | 2 | 0/20 | 0 | 50.0% | 512 | 577 [567, 590] |
-| serializable | 8 | 0/20 | 0 | 87.5% | 493 | 525 [517, 530] |
-| serializable | 32 | 0/20 | 0 | 96.9% | 482 | 533 [527, 539] |
-| advisory | 2 | 0/20 | 0 | 0.0% | 596 | 712 [704, 734] |
-| advisory | 8 | 0/20 | 0 | 0.0% | 1089 | 1772 [1725, 1806] |
-| advisory | 32 | 0/20 | 0 | 0.0% | 3032 | 5697 [5566, 5794] |
-
-<div class="tcap">TABLE XVI<br><span>Overlapping Multi-Seat Requests (E2, c = 16, 15 Trials, 240 Requests)</span></div>
-
-| Strategy | Success | Conflict | Deadlock | Ser. fail. | Seats sold / trial | DB total | p95 (ms) |
-|---|---|---|---|---|---|---|---|
-| naive | 240 | 0 | 0 | 0 | 9.9 | 571 | 2432 |
-| cond. UPDATE | 34 | 206 | 0 | 0 | 6.8 | 0 | 1334 |
-| pess. sorted | 37 | 203 | 0 | 0 | 7.4 | 0 | 1576 |
-| pess. unordered | 34 | 113 | 93 | 0 | 6.8 | 0 | 5432 |
-| optimistic | 36 | 204 | 0 | 0 | 7.2 | 0 | 1462 |
-| serializable | 15 | 0 | 0 | 225 | 3.0 | 0 | 544 |
-
-<div class="tcap">TABLE XVII<br><span>Low-Contention Latency, Throughput and Pairwise Tests vs. Conditional UPDATE (E3)</span></div>
-
-| Strategy | c | n | Median (ms) [95% CI] | p95 (ms) | Throughput (holds/s) [95% CI] | Cliff's δ | Holm p |
-|---|---|---|---|---|---|---|---|
-| naive | 1 | 30 | 392 [386, 400] | 413 | 2.5 [2.5, 2.6] | 0.76 | 4.4e-7 |
-| cond. UPDATE | 1 | 30 | 366 [361, 370] | 393 | 2.7 [2.7, 2.8] | — | ref. |
-| pess. sorted | 1 | 30 | 410 [400, 412] | 435 | 2.4 [2.4, 2.5] | 0.98 | 2.4e-10 |
-| optimistic | 1 | 30 | 474 [461, 480] | 508 | 2.1 [2.1, 2.1] | 1.00 | 1.5e-10 |
-| serializable | 1 | 30 | 401 [397, 406] | 425 | 2.5 [2.5, 2.5] | 0.95 | 5.7e-10 |
-| advisory | 1 | 30 | 565 [553, 575] | 598 | 1.8 [1.7, 1.8] | 1.00 | 1.5e-10 |
-| naive | 16 | 480 | 435 [430, 440] | 502 | 31.8 [31.4, 32.2] | 0.96 | < 10⁻¹⁵ |
-| cond. UPDATE | 16 | 480 | 344 [342, 347] | 400 | 38.3 [36.8, 39.8] | — | ref. |
-| pess. sorted | 16 | 480 | 445 [438, 452] | 518 | 31.1 [30.7, 31.4] | 0.96 | < 10⁻¹⁵ |
-| optimistic | 16 | 480 | 441 [438, 448] | 510 | 30.5 [29.5, 31.5] | 0.98 | < 10⁻¹⁵ |
-| serializable | 16 | 456 | 439 [434, 442] | 496 | 29.8 [28.0, 31.4] | 0.97 | < 10⁻¹⁵ |
-| advisory | 16 | 480 | 5614 [5605, 5619] | 5771 | 2.8 [2.8, 2.8] | 1.00 | < 10⁻¹⁵ |
-
-## References
-
-<div class="refs">
-
-[1] H. Berenson, P. Bernstein, J. Gray, J. Melton, E. O'Neil, and P. O'Neil, "A critique of ANSI SQL isolation levels," in *Proc. ACM SIGMOD Int. Conf. Manage. Data*, 1995, pp. 1–10.
-
-[2] P. Bailis, A. Fekete, M. J. Franklin, A. Ghodsi, J. M. Hellerstein, and I. Stoica, "Feral concurrency control: An empirical investigation of modern application integrity," in *Proc. ACM SIGMOD Int. Conf. Manage. Data*, 2015, doi: 10.1145/2723372.2737784.
-
-[3] D. R. K. Ports and K. Grittner, "Serializable snapshot isolation in PostgreSQL," *Proc. VLDB Endow.*, vol. 5, no. 12, pp. 1850–1861, 2012, doi: 10.14778/2367502.2367523.
-
-[4] T. Warszawski and P. Bailis, "ACIDRain: Concurrency-related attacks on database-backed web applications," in *Proc. ACM SIGMOD Int. Conf. Manage. Data*, 2017, doi: 10.1145/3035918.3064037.
-
-[5] H. T. Kung and J. T. Robinson, "On optimistic methods for concurrency control," *ACM Trans. Database Syst.*, vol. 6, no. 2, pp. 213–226, Jun. 1981.
-
-[6] PostgreSQL Global Development Group, "Transaction isolation," *PostgreSQL Documentation*, ch. 13.2. [Online]. Available: https://www.postgresql.org/docs/current/transaction-iso.html
-
-[7] A. Georges, D. Buytaert, and L. Eeckhout, "Statistically rigorous Java performance evaluation," in *Proc. ACM OOPSLA*, 2007, pp. 57–76.
-
-[8] T. Hoefler and R. Belli, "Scientific benchmarking of parallel computing systems: Twelve ways to tell the masses when reporting performance results," in *Proc. Int. Conf. High Perform. Comput., Netw., Storage Anal. (SC)*, 2015, doi: 10.1145/2807591.2807644.
-
-[9] T. Mytkowicz, A. Diwan, M. Hauswirth, and P. F. Sweeney, "Producing wrong data without doing anything obviously wrong!," in *Proc. ASPLOS*, 2009, pp. 265–276.
-
-[10] K. Kingsbury, "Jepsen: PostgreSQL 12.3," Jepsen, 2020. [Online]. Available: https://jepsen.io/analyses/postgresql-12.3
-
-[11] M. Kleppmann, "How to do distributed locking," Feb. 8, 2016. [Online]. Available: https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
-
-[12] J. Dean and L. A. Barroso, "The tail at scale," *Commun. ACM*, vol. 56, no. 2, pp. 74–80, 2013.
-
-[13] L. Wang, M. Li, Y. Zhang, T. Ristenpart, and M. Swift, "Peeking behind the curtains of serverless platforms," in *Proc. USENIX Annu. Tech. Conf.*, 2018, pp. 133–146.
-
-[14] L. D. Brown, T. T. Cai, and A. DasGupta, "Interval estimation for a binomial proportion," *Statist. Sci.*, vol. 16, no. 2, pp. 101–133, 2001.
-
-[15] "Ticketmaster cancels public sale of Taylor Swift tour tickets," WSB-TV / Cox Media Group, Nov. 2022.
-
-[16] "Coldplay India tour 2025: Band adds 3rd Mumbai show amid ticket chaos on BookMyShow," *Business Today*, Sep. 22, 2024.
-
-[17] J. Brooke, "SUS: A 'quick and dirty' usability scale," in *Usability Evaluation in Industry*, P. W. Jordan, B. Thomas, B. A. Weerdmeester, and I. L. McClelland, Eds. London, U.K.: Taylor & Francis, 1996, pp. 189–194.
-
-[18] A. Bangor, P. Kortum, and J. Miller, "Determining what individual SUS scores mean: Adding an adjective rating scale," *J. Usability Stud.*, vol. 4, no. 3, pp. 114–123, 2009.
-
-[19] S. K. Card, T. P. Moran, and A. Newell, "The keystroke-level model for user performance time with interactive systems," *Commun. ACM*, vol. 23, no. 7, pp. 396–410, 1980.
-
-[20] World Wide Web Consortium, "Web Content Accessibility Guidelines (WCAG) 2.2," W3C Recommendation, Oct. 5, 2023. [Online]. Available: https://www.w3.org/TR/WCAG22/
-
-[21] Deque Systems, "axe-core: Accessibility engine for automated web UI testing." [Online]. Available: https://github.com/dequelabs/axe-core
-
-[22] Google, "Largest Contentful Paint (LCP)," *web.dev*. [Online]. Available: https://web.dev/articles/lcp
-
-[23] OWASP Foundation, "OWASP API Security Top 10 – 2023." [Online]. Available: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
-
-[24] K. Järvelin and J. Kekäläinen, "Cumulated gain-based evaluation of IR techniques," *ACM Trans. Inf. Syst.*, vol. 20, no. 4, pp. 422–446, 2002.
-
-[25] World Wide Web Consortium, "Developing a keyboard interface," *ARIA Authoring Practices Guide*. [Online]. Available: https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/
-
-[26] F. Wilcoxon, "Individual comparisons by ranking methods," *Biometrics Bull.*, vol. 1, no. 6, pp. 80–83, 1945.
-
-[27] M. J. Pazzani and D. Billsus, "Content-based recommendation systems," in *The Adaptive Web*, LNCS 4321. Berlin, Germany: Springer, 2007, pp. 325–341.
-
-</div>
-
-</div>
+![fig:extra|1.0](../../figures/report/screens_extra.png) Additional CineBook screens: (a) choosing the number of seats and (b) the booking summary with the hold timer

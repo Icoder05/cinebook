@@ -1,0 +1,488 @@
+[
+  {
+    "tag": "nielsen1993",
+    "type": "Book",
+    "authors": [
+      [
+        "Nielsen",
+        "J."
+      ]
+    ],
+    "title": "Usability Engineering",
+    "city": "San Diego, CA",
+    "publisher": "Academic Press",
+    "year": "1993"
+  },
+  {
+    "tag": "iso9241",
+    "type": "Report",
+    "corporate": "International Organization for Standardization",
+    "title": "ISO 9241-11:2018 Ergonomics of human-system interaction, Part 11: Usability: Definitions and concepts",
+    "city": "Geneva",
+    "publisher": "ISO",
+    "year": "2018"
+  },
+  {
+    "tag": "card1980",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Card",
+        "S. K."
+      ],
+      [
+        "Moran",
+        "T. P."
+      ],
+      [
+        "Newell",
+        "A."
+      ]
+    ],
+    "title": "The keystroke-level model for user performance time with interactive systems",
+    "journal": "Communications of the ACM",
+    "volume": "23",
+    "issue": "7",
+    "pages": "396-410",
+    "year": "1980"
+  },
+  {
+    "tag": "brooke1996",
+    "type": "BookSection",
+    "authors": [
+      [
+        "Brooke",
+        "J."
+      ]
+    ],
+    "title": "SUS: A 'quick and dirty' usability scale",
+    "bookTitle": "Usability Evaluation in Industry",
+    "editors": [
+      [
+        "Jordan",
+        "P. W."
+      ],
+      [
+        "Thomas",
+        "B."
+      ],
+      [
+        "Weerdmeester",
+        "B. A."
+      ],
+      [
+        "McClelland",
+        "I. L."
+      ]
+    ],
+    "city": "London",
+    "publisher": "Taylor & Francis",
+    "year": "1996",
+    "pages": "189-194"
+  },
+  {
+    "tag": "bangor2009",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Bangor",
+        "A."
+      ],
+      [
+        "Kortum",
+        "P."
+      ],
+      [
+        "Miller",
+        "J."
+      ]
+    ],
+    "title": "Determining what individual SUS scores mean: Adding an adjective rating scale",
+    "journal": "Journal of Usability Studies",
+    "volume": "4",
+    "issue": "3",
+    "pages": "114-123",
+    "year": "2009"
+  },
+  {
+    "tag": "lcp",
+    "type": "InternetSite",
+    "corporate": "Google",
+    "title": "Largest Contentful Paint (LCP)",
+    "site": "web.dev",
+    "url": "https://web.dev/articles/lcp",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "30"
+  },
+  {
+    "tag": "wcag22",
+    "type": "InternetSite",
+    "corporate": "World Wide Web Consortium",
+    "title": "Web Content Accessibility Guidelines (WCAG) 2.2",
+    "site": "W3C Recommendation",
+    "year": "2023",
+    "month": "October",
+    "day": "5",
+    "url": "https://www.w3.org/TR/WCAG22/",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "30"
+  },
+  {
+    "tag": "axe",
+    "type": "InternetSite",
+    "corporate": "Deque Systems",
+    "title": "axe-core: Accessibility engine for automated web UI testing",
+    "site": "GitHub",
+    "url": "https://github.com/dequelabs/axe-core",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "30"
+  },
+  {
+    "tag": "apg",
+    "type": "InternetSite",
+    "corporate": "World Wide Web Consortium",
+    "title": "Developing a keyboard interface",
+    "site": "ARIA Authoring Practices Guide",
+    "url": "https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "31"
+  },
+  {
+    "tag": "dean2013",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Dean",
+        "J."
+      ],
+      [
+        "Barroso",
+        "L. A."
+      ]
+    ],
+    "title": "The tail at scale",
+    "journal": "Communications of the ACM",
+    "volume": "56",
+    "issue": "2",
+    "pages": "74-80",
+    "year": "2013"
+  },
+  {
+    "tag": "mytkowicz2009",
+    "type": "ConferenceProceedings",
+    "authors": [
+      [
+        "Mytkowicz",
+        "T."
+      ],
+      [
+        "Diwan",
+        "A."
+      ],
+      [
+        "Hauswirth",
+        "M."
+      ],
+      [
+        "Sweeney",
+        "P. F."
+      ]
+    ],
+    "title": "Producing wrong data without doing anything obviously wrong!",
+    "conference": "Proceedings of the 14th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)",
+    "city": "Washington, DC",
+    "year": "2009",
+    "pages": "265-276"
+  },
+  {
+    "tag": "georges2007",
+    "type": "ConferenceProceedings",
+    "authors": [
+      [
+        "Georges",
+        "A."
+      ],
+      [
+        "Buytaert",
+        "D."
+      ],
+      [
+        "Eeckhout",
+        "L."
+      ]
+    ],
+    "title": "Statistically rigorous Java performance evaluation",
+    "conference": "Proceedings of the 22nd ACM SIGPLAN Conference on Object-Oriented Programming, Systems, Languages and Applications (OOPSLA)",
+    "city": "Montreal",
+    "year": "2007",
+    "pages": "57-76"
+  },
+  {
+    "tag": "hoefler2015",
+    "type": "ConferenceProceedings",
+    "authors": [
+      [
+        "Hoefler",
+        "T."
+      ],
+      [
+        "Belli",
+        "R."
+      ]
+    ],
+    "title": "Scientific benchmarking of parallel computing systems: Twelve ways to tell the masses when reporting performance results",
+    "conference": "Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis (SC15)",
+    "city": "Austin, TX",
+    "year": "2015"
+  },
+  {
+    "tag": "pgindex",
+    "type": "InternetSite",
+    "corporate": "PostgreSQL Global Development Group",
+    "title": "Partial indexes",
+    "site": "PostgreSQL Documentation, Section 11.8",
+    "url": "https://www.postgresql.org/docs/current/indexes-partial.html",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "30"
+  },
+  {
+    "tag": "mann1947",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Mann",
+        "H. B."
+      ],
+      [
+        "Whitney",
+        "D. R."
+      ]
+    ],
+    "title": "On a test of whether one of two random variables is stochastically larger than the other",
+    "journal": "The Annals of Mathematical Statistics",
+    "volume": "18",
+    "issue": "1",
+    "pages": "50-60",
+    "year": "1947"
+  },
+  {
+    "tag": "kruskal1952",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Kruskal",
+        "W. H."
+      ],
+      [
+        "Wallis",
+        "W. A."
+      ]
+    ],
+    "title": "Use of ranks in one-criterion variance analysis",
+    "journal": "Journal of the American Statistical Association",
+    "volume": "47",
+    "issue": "260",
+    "pages": "583-621",
+    "year": "1952"
+  },
+  {
+    "tag": "holm1979",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Holm",
+        "S."
+      ]
+    ],
+    "title": "A simple sequentially rejective multiple test procedure",
+    "journal": "Scandinavian Journal of Statistics",
+    "volume": "6",
+    "issue": "2",
+    "pages": "65-70",
+    "year": "1979"
+  },
+  {
+    "tag": "cliff1993",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Cliff",
+        "N."
+      ]
+    ],
+    "title": "Dominance statistics: Ordinal analyses to answer ordinal questions",
+    "journal": "Psychological Bulletin",
+    "volume": "114",
+    "issue": "3",
+    "pages": "494-509",
+    "year": "1993"
+  },
+  {
+    "tag": "brown2001",
+    "type": "JournalArticle",
+    "authors": [
+      [
+        "Brown",
+        "L. D."
+      ],
+      [
+        "Cai",
+        "T. T."
+      ],
+      [
+        "DasGupta",
+        "A."
+      ]
+    ],
+    "title": "Interval estimation for a binomial proportion",
+    "journal": "Statistical Science",
+    "volume": "16",
+    "issue": "2",
+    "pages": "101-133",
+    "year": "2001"
+  },
+  {
+    "tag": "rfc9309",
+    "type": "Report",
+    "authors": [
+      [
+        "Koster",
+        "M."
+      ],
+      [
+        "Illyes",
+        "G."
+      ],
+      [
+        "Zeller",
+        "H."
+      ],
+      [
+        "Sassman",
+        "L."
+      ]
+    ],
+    "title": "Robots Exclusion Protocol, RFC 9309",
+    "publisher": "Internet Engineering Task Force",
+    "year": "2022"
+  },
+  {
+    "tag": "owasp2023",
+    "type": "InternetSite",
+    "corporate": "OWASP Foundation",
+    "title": "OWASP API Security Top 10 - 2023",
+    "site": "OWASP",
+    "url": "https://owasp.org/API-Security/editions/2023/en/0x11-t10/",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "31"
+  },
+  {
+    "tag": "playwright",
+    "type": "InternetSite",
+    "corporate": "Microsoft",
+    "title": "Playwright: Fast and reliable end-to-end testing for modern web apps",
+    "site": "playwright.dev",
+    "url": "https://playwright.dev",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "30"
+  },
+  {
+    "tag": "bailis2015",
+    "type": "ConferenceProceedings",
+    "authors": [
+      [
+        "Bailis",
+        "P."
+      ],
+      [
+        "Fekete",
+        "A."
+      ],
+      [
+        "Franklin",
+        "M. J."
+      ],
+      [
+        "Ghodsi",
+        "A."
+      ],
+      [
+        "Hellerstein",
+        "J. M."
+      ],
+      [
+        "Stoica",
+        "I."
+      ]
+    ],
+    "title": "Feral concurrency control: An empirical investigation of modern application integrity",
+    "conference": "Proceedings of the 2015 ACM SIGMOD International Conference on Management of Data",
+    "city": "Melbourne",
+    "year": "2015",
+    "pages": "1327-1342"
+  },
+  {
+    "tag": "berenson1995",
+    "type": "ConferenceProceedings",
+    "authors": [
+      [
+        "Berenson",
+        "H."
+      ],
+      [
+        "Bernstein",
+        "P."
+      ],
+      [
+        "Gray",
+        "J."
+      ],
+      [
+        "Melton",
+        "J."
+      ],
+      [
+        "O'Neil",
+        "E."
+      ],
+      [
+        "O'Neil",
+        "P."
+      ]
+    ],
+    "title": "A critique of ANSI SQL isolation levels",
+    "conference": "Proceedings of the 1995 ACM SIGMOD International Conference on Management of Data",
+    "city": "San Jose, CA",
+    "year": "1995",
+    "pages": "1-10"
+  },
+  {
+    "tag": "pgiso",
+    "type": "InternetSite",
+    "corporate": "PostgreSQL Global Development Group",
+    "title": "Transaction isolation",
+    "site": "PostgreSQL Documentation, Section 13.2",
+    "url": "https://www.postgresql.org/docs/current/transaction-iso.html",
+    "yearAccessed": "2026",
+    "monthAccessed": "October",
+    "dayAccessed": "25"
+  },
+  {
+    "tag": "webaim",
+    "type": "InternetSite",
+    "corporate": "WebAIM",
+    "title": "The WebAIM Million: An accessibility analysis of the top 1,000,000 home pages",
+    "site": "WebAIM",
+    "url": "https://webaim.org/projects/million/",
+    "yearAccessed": "2026",
+    "monthAccessed": "November",
+    "dayAccessed": "1"
+  }
+]

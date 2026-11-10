@@ -32,7 +32,9 @@
     "experiments:analyze": "node experiments/harness/analyze.mjs --neon main-neon --pglite main-pglite --live main-live && node experiments/harness/analyze-extended.mjs",
     "experiments:figures": "node experiments/harness/charts.mjs",
     "experiments:dashboard": "node experiments/dashboard/server.mjs",
-    "report:build": "node experiments/harness/build-report.mjs && node experiments/harness/build-report.mjs --doc literature-review && node experiments/harness/build-docx.mjs && node experiments/harness/build-docx.mjs --doc literature-review"
+    "report:build": "node experiments/harness/build-report-word.mjs && .venv/Scripts/python experiments/analysis/finalize_word.py && node experiments/harness/build-report.mjs --doc literature-review && node experiments/harness/build-docx.mjs --doc literature-review",
+    "analysis:workbook": ".venv/Scripts/python experiments/analysis/build_workbook.py",
+    "report:assets": "node experiments/harness/screenshots.mjs && node experiments/harness/diagrams.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
